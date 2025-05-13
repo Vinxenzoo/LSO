@@ -7,6 +7,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include <pthread.h>
+#include <stdbool.h>
+
 #define  MAX_NAME_PLAYER 20
 #define  MESSAGE_SIZE 64
 
@@ -38,7 +41,7 @@ typedef struct ServerStruct //Pascal Case
 struct PlayerNode
 {
   char name[MAX_NAME_PLAYER];
-  enum player_status;
+  enum player_status status;
   pthread_cond_t cv_state;
   pthread_mutex_t mutex_state;
   bool champion;
