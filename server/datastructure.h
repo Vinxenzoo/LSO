@@ -7,6 +7,24 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#define  MAX_NAME_PLAYER 20
+#define  MESSAGE_SIZE 64
+
+enum game_status
+{
+  NEW_GAME,
+  WAITING,
+  RUNNING,
+  END_GAME
+};
+
+enum player_status
+{
+  IN_LOBBY,
+  REQUESTING,
+  IN_GAME
+};
+
 typedef struct ServerStruct //Pascal Case
 {
     int fd;
@@ -15,5 +33,36 @@ typedef struct ServerStruct //Pascal Case
     unsigned short int opt;
 
 }Server; //Pascal Case
+
+
+struct PlayerNode
+{
+  char name[MAX_NAME_PLAYER];
+  enum player_status;
+  pthread_cond_t cv_state;
+  pthread_mutex_t mutex_state;
+  bool champion;
+  unsigned int wins;
+  unsigned int lost;
+  unsigned int draws;
+  pthread_t player_id;
+  int player_sd;
+  struct PlayerNode *next_node;
+}players;
+
+
+struct GameNode
+{
+  char owner[MAX_NAME_PLAYER];
+  int owner_sd;
+  char enemy[MAX_NAME_PLAYER];
+  int enemy_sd;
+  enum game_status status;
+  bool join_request;
+  pthread_cond_t cv_state;
+  pthread_mutex_t mutex_state;
+  struct GameNode *next_node;
+}games;
+
 
 #endif
