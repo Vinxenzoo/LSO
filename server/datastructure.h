@@ -21,6 +21,14 @@ enum game_status
   END_GAME
 };
 
+enum game_result
+{
+  NONE,
+  VICTORY,
+  DEFEAT,
+  DRAW
+};
+
 enum player_status
 {
   IN_LOBBY,
@@ -46,7 +54,7 @@ struct PlayerNode
   pthread_mutex_t mutex_state;
   bool champion;
   unsigned int wins;
-  unsigned int lost;
+  unsigned int losts;
   unsigned int draws;
   pthread_t player_id;
   int player_sd;
