@@ -164,3 +164,170 @@ struct PlayerNode* add_player( const char *player_name, const int player_sd )
 
    return player;
 }
+
+//////////////////////////////////
+//////////////////////////////////
+
+
+void lobby(struct PlayerNode *player_data)
+{
+
+    const int player = dati_giocatore -> player;
+    bool matched = true;   
+
+    char buff-in[MAXIN]; //contiene le "scelte" del giocatore
+    char buff-out[MAXOUT]; //contiene tutte le statistiche del giocatore formattate in un'unica stringa
+
+    do
+    {
+      /*
+        memset(buff-in, 0, MAXIN);
+        memset(buff-out, 0, MAXOUT);
+        player_data -> status = IN_LOBBY;
+        //conversione in stringhe delle statistiche del giocatore
+        char wins[3]; sprintf(wins, "%u", player_data -> wins);
+        char losts[3]; sprintf(losts, "%u", player_data -> losts);
+        char draws[3]; sprintf(draws, "%u", player_data -> draws);
+
+        buff-out[0] = '\n'; //invio della stringa statistiche
+        strcat(buff-out, player_data -> name);
+        strcat(buff-out, "\nWINS: "); strcat(buff-out, wins);
+        strcat(buff-out, "\nsconfitte: "); strcat(buff-out, losts);
+        strcat(buff-out, "\npareggi: "); strcat(buff-out, draws);
+        if (send(playr, buff-out, strlen(buff-out), MSG_NOSIGNAL) < 0) error_handler(player);
+       
+        */
+
+        send_game();
+        do //recv può essere interrotta da un segnale e restituire EINTR come errore
+        {  //questo ciclo gestisce l'errore ed evita il crash del client
+            if (errno == EINTR) errno = 0;
+            if (recv(player, buff-in, MAXIN, 0) <= 0 && errno != EINTR) error_handler(player);
+        } while (errno == EINTR);
+        
+        int index = 0;
+        while (buff-in[index] != '\0') //case insensitive
+        {
+            buff-in[index] = toupper(buff-in[index]);
+            index++;
+        }
+        if (strcmp(buff-in, "QUIT") == 0) matched = false;
+        else if (strcmp(buff-in, "CREATE") == 0) 
+        {
+            do
+            {   //crea e gioca la partita come proprietario
+                struct GameNode *GameNode = // crea_partita_in_testa(player_data -> name, player);
+                if (GameNode != NULL) 
+                {
+                    play_game(GameNode);
+                    delete_game(GameNode);
+                }
+                else
+                {
+                    if (send(player, "impossible to create match\n", 49, MSG_NOSIGNAL) < 0) error_handler(player);
+                }
+            } while (player_data -> champion && !quit(player));
+            //partita finita
+            if (send(player, "Return in lobby\n", 17, MSG_NOSIGNAL) < 0) error_handler(player);
+        }
+        else 
+        {   //invia la richiesta di unione alla partita, se accettata si blocca sulla propria cond_var fino a fine partita
+            int i = atoi(buff-in);
+            struct GameNode *match = NULL;
+            if (i != 0) match = (trova_partita_da_indice(i));
+
+            if (match == NULL)
+            {
+                if (send(player, "there isn't a match\n", 20, MSG_NOSIGNAL) < 0) error_handler(sd_giocatore);
+            }
+            else
+            {   //gestisce la richiesta alla partita
+                player_data -> status = REQUESTING;
+                if (!accept_match(match, player, player_data -> name))
+                {
+                    if (match -> union == false)
+                        {if (send(player, "Request refused\n", 30, MSG_NOSIGNAL) < 0) error_handler(player);}
+                    else   
+                        {if (send(player, "Another player accepted match\n", 64, MSG_NOSIGNAL) < 0) error_handler(player);}
+                }
+                else //richiesta accettata
+                {
+                    player_data -> status = IN_GAME;
+                    pthread_mutex_lock(&(player_data -> status_mutex));
+
+                    while (player_data -> status == IN_GAME)
+                    {
+                        //attende un segnale di fine partita
+                        pthread_cond_wait(&(player_data -> stato_cv), &(play_game -> status_mutex));
+                    }
+                    pthread_mutex_unlock(&(player_data -> status_mutex));
+
+                    while (player_data -> champion && !quit(player)) //se vince diventa il proprietario
+                    {
+                        struct GameNode *gameNode = crea_partita_in_testa(player_data -> name, player);
+                        if (gameNode != NULL) 
+                        {
+                            play_game(gameNode);
+                            delete_game(gameNode);
+                        }
+                        else
+                        {
+                            if (send(player, "Impossible to create match, attention please...\n", 49, MSG_NOSIGNAL) < 0) error_handler(player);
+                        }
+                    }
+                    if (send(player, "Return in Lobby\n", 17, MSG_NOSIGNAL) < 0) error_handler(player);
+                }
+            }
+        }
+    } while (matched);
+}
+
+bool match_accepted(struct GameNode *match, const int opponent, const char *name_opp)
+{
+    if (match -> union == true) return false;
+    const int host = match -> host;
+    char buf[MAXOUT];
+    memset(buf, 0, MAXOUT);
+    strcat(buf, name_opp); strcat(buf, " want match at your game, Do you accept? [s/n]\n");
+
+    char response = '\0'; //si occupa il codice client di verificare l'input
+
+    if (send(opponent, "attend host...\n", 30, MSG_NOSIGNAL) < 0) error_handler(opponent);
+    partita -> richiesta_unione = true;
+
+    if (send(opponent, buf, strlen(buf), MSG_NOSIGNAL) < 0) 
+    {
+        error_handler(host);
+        return false;
+    }
+    if (recv(host, &esponse, 1, 0) <= 0)
+    {
+        error_handler(opponent);
+        return false;
+    }
+
+    resp = toupper(res); //case insensitive
+    if (res == 'S')
+    {
+        strcpy(match -> opponent, name_opp);
+        match -> opponent = opponent;
+        if (send(host, "*** starting match by host***\n", 44, MSG_NOSIGNAL) < 0) error_handler(host);
+        if (send(opponent, "*** starting match by opponent***\n", 42, MSG_NOSIGNAL) < 0) error_handler(sd_avversario);
+        if (match != NULL)
+        {
+            match -> status = IN_GAME;
+            match -> union = false;
+            pthread_cond_signal(&(match -> stato_cv));
+        }
+        return true;
+    }
+    else
+    {
+        if (send(host, "Request refused, searching another opponent...\n", 51, MSG_NOSIGNAL) < 0) error_handler(player);
+        match -> union = false;
+    }
+    return false;
+}
+
+
+

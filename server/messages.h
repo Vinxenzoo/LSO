@@ -3,9 +3,9 @@
 
 #define SERVER_ERROR "01\n"
 
-#define VICTORY "1A\n"
-#define LOST    "1B\n"
-#define DRAW    "1C\n"
+#define VICTORY "\n1A\n"
+#define LOST    "\n1B\n"
+#define DRAW    "\n1C\n"
 
 
 #define INSERT_PLAYER_NAME "20\n"
