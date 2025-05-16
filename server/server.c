@@ -330,4 +330,172 @@ bool match_accepted(struct GameNode *match, const int opponent, const char *name
 }
 
 
+void play_game(struct GameNode *gameData)
+{
+    const int host = gameData -> host;
+    struct nodo_giocatore *host = trova_giocatore_da_sd(host);
+    players -> status = IN_GAME;
+    players -> champion = true;
+    if (send(host, "waiting opponent...\n", 30, MSG_NOSIGNAL) < 0) error_handler(host);
+    segnala_cambiamento_partite();
+
+    pthread_mutex_lock(&(gameData -> mutex_state));
+    while (gameData -> status != Running)
+    {
+        //controllo periodico in caso il proprietario si disconnetta mentre la partita è in attesa
+        struct timespec waiting_time;
+        clock_gettime(CLOCK_REALTIME, &waiting_time);
+        tempo_attesa.tv_sec += 1;
+        tempo_attesa.tv_nsec = 0;
+        int all_results = pthread_cond_timedwait(&(gameData -> cv_state), &(gameData -> mutex_state), &waiting_time);
+        if (all_results  == ETIMEDOUT) 
+        { 
+            //messaggio nullo che controlla se la socket è ancora attiva
+            if (send(,host "\0", 1, MSG_NOSIGNAL) < 0) error_handler(host);
+        }
+    }
+    pthread_mutex_unlock(&(gameData -> mutex_state));
+
+    const int opponent = gameData -> opponent;
+    struct PlayerNode *opponentt = trova_giocatore_da_sd(opponent);
+    opponentt -> champion = false;
+
+    int round = 0;
+
+    do //si esce dal ciclo quando viene rifiutata la rivincita o se non c'è un pareggio
+    {
+        gameData -> status = RUNNING;
+        round++;
+        sign_change_game();
+
+        bool err = false; //rappresenta un errore di disconnesione
+        char play = '\0';
+        char host_result = NONE; //il codice del client cambia il valore di questa variabile quando la partita finisce
+        char opponent_result = NONE;
+        //'0' = ancora in corso '1' = vince proprietario, '2' = vince avversario, '3' = pareggio
+
+        //inizia la partita
+        do
+        {   //di default il server invia NOERROR per segnalare che è tutto ok, altrimenti è l'error handler a mandare ERROR all'altro giocatore
+            //inoltre; visto che la partita è gestita dal thread proprietario, l'error handler si occupa anche di sbloccare l'avversario
+            //in caso fosse il proprietario a disconnettersi
+            if (round%2 != 0)
+            {
+                //inizia il proprietario
+                if (recv(host, &play, 1, 0) <= 0) {error_handler(host); }
+                if (recv(host, &host_result, 1, 0) <= 0) {error_handler(host); }
+                if (send(opponent, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
+                if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
+                if (host_result != NONE) break;
+
+                //turno dell'avversario
+                if (recv(opponent, &play, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
+                if (recv(opponent, &opponent_result, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
+                if (send(host, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
+                if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
+            }
+            else 
+            {
+                //inizia l'avversario
+                if (recv(opponent, &play, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
+                if (recv(opponent, &opponent_result, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
+                if (send(host, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
+                if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
+                if (opponent_result != NESSUNO) break;
+
+                //turno del proprietario
+                if (recv(host, &play, 1, 0) <= 0) {error_handler(host); }
+                if (recv(host, &host_result, 1, 0) <= 0) {error_handler(host); }
+                if (send(opponent, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
+                if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
+            }
+        } while (host_result == NONE && opponent_result == NONE);
+
+        //in caso di errore si aggiornano le vittorie e si esce dalla partita
+        if (err) 
+        {
+            host -> wins++;
+            host -> champion = true;
+            break;
+        }
+
+        //si aggiornano i contatori dei giocatori
+        if (host_result == WIN || opponent_result == LOSE)
+        {
+            host -> wins++;
+            opponent -> losts++;
+            host -> champion = true;
+            opponent -> champion = false;
+            opponent -> status = IN_LOBBY;
+            pthread_cond_signal(&(opponent -> cv_state));
+            break;
+        }
+        else if (host_result == LOSE || opponent_result == WIN)
+        {
+            host -> losts++;
+            opponent -> wins++;
+            host -> champion = false;
+            opponent -> champion = true;
+            opponent -> status = REQUESTING;
+            pthread_cond_signal(&(opponent -> cv_state));
+            break;
+        }
+
+        host -> draws++;
+        opponent -> draws++;
+
+        gameData -> status = END_GAME;
+        sign_change_game();
+
+    //partita finita, rimane in stato terminata finchè la rivincita viene accettata o rifiutata
+    } while (rematch(host, opponent));
+}
+
+bool rivincita(const int host, const int opponent)
+{
+    struct PlayerNode *opponent = find_player(opponent);
+    char opponent_response = '\0';
+    char host_response = '\0';
+
+    if (send(opponent, "Rematch? [s/n]\n", 17, MSG_NOSIGNAL) < 0) error_handler(opponent);
+    if (recv(opponent, &opponent_response, 1, 0) <= 0) error_handler(opponent);
+    
+    if (opponent_response != 'S') {if (send(host, "Rematch refused\n", 36, MSG_NOSIGNAL) < 0) error_handler(host);}
+    else //avversario vuole rivincita
+    {
+        if (send(opponent, "Waiting host...\n", 30, MSG_NOSIGNAL) < 0) error_handler(opponent);
+        if (send(host, "do you want a rematch? [s/n]\n", 48, MSG_NOSIGNAL) < 0) error_handler(host);
+        if (recv(host, &host_response, 1, 0) <= 0) error_handler(host);
+    }
+    if (host_response != 'S') //si torna alla lobby
+    {
+        if (host_response == 'N')
+        {
+            if (send(opponent, "Rematch refused\n", 37, MSG_NOSIGNAL) < 0) error_handler(opponent);
+        }
+        if (opponent != NULL)
+        {
+            opponent -> status = REQUESTING;
+            pthread_cond_signal(&(opponent -> cv_state));
+        }
+        return false;
+    }
+    else
+    {
+        if (send(opponent, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) error_handler(opponent);
+        if (send(host, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) error_handler(host);
+        return true;
+    }
+}
+
+bool quit(const int host)
+{
+    char response = '\0';
+    if (send(host, "Do ypu want to accept another player? [s/n]\n", 40, MSG_NOSIGNAL) < 0) error_handler(host);
+    if (recv(host, &response, 1, 0) <= 0) error_handler(host);
+    response = toupper(response);
+    if (response == 'S') return false;
+    else return true;
+}
+
 

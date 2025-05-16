@@ -35,8 +35,8 @@ void lobby(struct PlayerNode *player_data);
 //se il proprietario accetta la richiesta di unione alla partita inserisce i dati dell'avversario nel nodo partita e restituisce vero, falso altrimenti
 bool match_accepted(struct GameNode *match, const int opponent, const char *opponent_name);
 
-//void play_game(struct GameNode *gameData);
-//bool rematch(const int host, const int opponent);
-//bool quit(const int player_sd);
+void play_game(struct GameNode *gameData);
+bool rematch(const int host, const int opponent);
+bool quit(const int player_sd);
 
 #endif
