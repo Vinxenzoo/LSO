@@ -43,13 +43,15 @@ void* player_thread( void *sd )
    const int player_sd = *( ( int * ) sd );
    struct PlayerNode *player = register_player( player_sd );
 
+   player_lobby();
+
 }
 
 
 struct PlayerNode* register_player( const int player_sd )
 {
    char *player_name = check_player( player_sd );
-   struct PlayerNode *player = add_player( player_name );
+   struct PlayerNode *player = add_player( player_name, player_sd );
    free( player_name );
    return player; 
 }
@@ -81,7 +83,7 @@ char* check_player( const int player_sd )
       if( recv( player_sd, player_name, MAX_NAME_PLAYER, 0 ) <= 0 )
       {
          close( player_sd );
-         free( player_sd );
+         free( player_name );
          printf( "Check Error.\n" );
          pthread_exit( NULL );
       }
@@ -152,7 +154,7 @@ struct PlayerNode* add_player( const char *player_name, const int player_sd )
    pthread_mutex_init( &( player->mutex_state ), NULL );
    pthread_cond_init( &( player->cv_state ), NULL );
    player->status = IN_LOBBY;
-   player->player_id = pthread_self();
+   player->player_tid = pthread_self();
    player->player_sd = player_sd;
    player->champion = false;
 
@@ -165,121 +167,302 @@ struct PlayerNode* add_player( const char *player_name, const int player_sd )
    return player;
 }
 
-//////////////////////////////////
-//////////////////////////////////
-
-
-void lobby(struct PlayerNode *player_data)
+void player_lobby()
 {
+   pthread_mutex_lock( &player_mutex );
+   struct PlayerNode *player = player_head;
+   pthread_mutex_unlock( &player_mutex );
 
-    const int player = dati_giocatore -> player;
-    bool matched = true;   
+   const pthread_t sender_tid = pthread_self();
+   pthread_t receiver_tid = 0;
 
-    char buff-in[MAXIN]; //contiene le "scelte" del giocatore
-    char buff-out[MAXOUT]; //contiene tutte le statistiche del giocatore formattate in un'unica stringa
+   while( player != NULL )
+   {
+      receiver_tid = player->player_tid;
 
-    do
-    {
-      /*
-        memset(buff-in, 0, MAXIN);
-        memset(buff-out, 0, MAXOUT);
-        player_data -> status = IN_LOBBY;
-        //conversione in stringhe delle statistiche del giocatore
-        char wins[3]; sprintf(wins, "%u", player_data -> wins);
-        char losts[3]; sprintf(losts, "%u", player_data -> losts);
-        char draws[3]; sprintf(draws, "%u", player_data -> draws);
+      if(receiver_tid != sender_tid && ( player->status == IN_LOBBY ) )
+      {
+         pthread_kill( receiver_tid, SIGUSR2 );
+      }
 
-        buff-out[0] = '\n'; //invio della stringa statistiche
-        strcat(buff-out, player_data -> name);
-        strcat(buff-out, "\nWINS: "); strcat(buff-out, wins);
-        strcat(buff-out, "\nsconfitte: "); strcat(buff-out, losts);
-        strcat(buff-out, "\npareggi: "); strcat(buff-out, draws);
-        if (send(playr, buff-out, strlen(buff-out), MSG_NOSIGNAL) < 0) error_handler(player);
-       
-        */
+      player = player->next_node; 
 
-        send_game();
-        do //recv può essere interrotta da un segnale e restituire EINTR come errore
-        {  //questo ciclo gestisce l'errore ed evita il crash del client
-            if (errno == EINTR) errno = 0;
-            if (recv(player, buff-in, MAXIN, 0) <= 0 && errno != EINTR) error_handler(player);
-        } while (errno == EINTR);
-        
-        int index = 0;
-        while (buff-in[index] != '\0') //case insensitive
-        {
-            buff-in[index] = toupper(buff-in[index]);
-            index++;
-        }
-        if (strcmp(buff-in, "QUIT") == 0) matched = false;
-        else if (strcmp(buff-in, "CREATE") == 0) 
-        {
-            do
-            {   //crea e gioca la partita come proprietario
-                struct GameNode *GameNode = // crea_partita_in_testa(player_data -> name, player);
-                if (GameNode != NULL) 
-                {
-                    play_game(GameNode);
-                    delete_game(GameNode);
-                }
-                else
-                {
-                    if (send(player, "impossible to create match\n", 49, MSG_NOSIGNAL) < 0) error_handler(player);
-                }
-            } while (player_data -> champion && !quit(player));
-            //partita finita
-            if (send(player, "Return in lobby\n", 17, MSG_NOSIGNAL) < 0) error_handler(player);
-        }
-        else 
-        {   //invia la richiesta di unione alla partita, se accettata si blocca sulla propria cond_var fino a fine partita
-            int i = atoi(buff-in);
-            struct GameNode *match = NULL;
-            if (i != 0) match = (trova_partita_da_indice(i));
+   }
+}
 
-            if (match == NULL)
+
+void lobby_handler( struct PlayerNode *player )
+{
+   char in_buffer[ MAX_MESSAGE_SIZE ];
+   char out_buffer[ MAX_MESSAGE_SIZE ];
+
+   const int player_sd = player->player_sd;
+   bool connected = true;
+
+   do
+   {
+      memset( in_buffer, 0, MAX_MESSAGE_SIZE );
+      memset( out_buffer, 0, MAX_MESSAGE_SIZE );
+      player->status = IN_LOBBY;
+
+      char wins[3];
+      sprintf( wins, "%u", player->wins );
+      char losts[3];
+      sprintf( losts, "%u", player->losts );
+      char draws[3];
+      sprintf( draws, "%u", player->draws );
+
+      out_buffer[0] = '\n';
+      strcat( out_buffer, "s" );
+      strcat( out_buffer, wins ); strcat( out_buffer, "-" );
+      strcat( out_buffer, losts ); strcat( out_buffer, "-" );
+      strcat( out_buffer, draws ); strcat( out_buffer, "\n");
+
+      if( send( player_sd, out_buffer, strlen( out_buffer ), MSG_NOSIGNAL ) < 0 )
+      {
+         printf( "Error sending stats.\n" );
+      }
+
+      do
+      {
+         if( errno == EINTR ) //Catch unexpected failures
+         {
+            errno = 0; //Avoid not expected failures
+         }
+         if( recv( player_sd, in_buffer, MAX_MESSAGE_SIZE, 0 ) <= 0 && errno != EINTR )
+	 {
+            printf("Generic Error in Lobby.\n");
+         }
+      }while( errno == EINTR );
+
+      if( strcmp( in_buffer, EXIT ) == 0 )
+      {
+         connected = false
+      }
+      else if( strcmp( in_buffer, CREATE ) == 0 )
+      {
+         do
+         {
+            struct GameNode *game = new_game( player->name, player_sd );
+
+            if( game != NULL )
             {
-                if (send(player, "there isn't a match\n", 20, MSG_NOSIGNAL) < 0) error_handler(sd_giocatore);
+               play_game( game );
+               delete_game( game );
             }
             else
-            {   //gestisce la richiesta alla partita
-                player_data -> status = REQUESTING;
-                if (!accept_match(match, player, player_data -> name))
-                {
-                    if (match -> union == false)
-                        {if (send(player, "Request refused\n", 30, MSG_NOSIGNAL) < 0) error_handler(player);}
-                    else   
-                        {if (send(player, "Another player accepted match\n", 64, MSG_NOSIGNAL) < 0) error_handler(player);}
-                }
-                else //richiesta accettata
-                {
-                    player_data -> status = IN_GAME;
-                    pthread_mutex_lock(&(player_data -> status_mutex));
-
-                    while (player_data -> status == IN_GAME)
-                    {
-                        //attende un segnale di fine partita
-                        pthread_cond_wait(&(player_data -> stato_cv), &(play_game -> status_mutex));
-                    }
-                    pthread_mutex_unlock(&(player_data -> status_mutex));
-
-                    while (player_data -> champion && !quit(player)) //se vince diventa il proprietario
-                    {
-                        struct GameNode *gameNode = crea_partita_in_testa(player_data -> name, player);
-                        if (gameNode != NULL) 
-                        {
-                            play_game(gameNode);
-                            delete_game(gameNode);
-                        }
-                        else
-                        {
-                            if (send(player, "Impossible to create match, attention please...\n", 49, MSG_NOSIGNAL) < 0) error_handler(player);
-                        }
-                    }
-                    if (send(player, "Return in Lobby\n", 17, MSG_NOSIGNAL) < 0) error_handler(player);
-                }
+            {
+               if( send( player_sd, CREATE_GAME_FAILED, 3, MSG_NOSIGNAL ) < 0 )
+               {
+	          printf( "Game creation failed.\n" );
+               }
             }
-        }
-    } while (matched);
+         } while( player->champion && !quit( player_sd );
+
+         if( send( player_sd, RETURN_LOBBY, 3, MSG_NOSIGNAL ) < 0 )
+         {
+            printf( "Return to lobby failed.\n" );
+         }
+      }
+      else
+      {
+         int index = atoi( in_buffer);
+         struct GameNode *fgame = NULL;
+
+         if( index != 0 )
+         {
+            fgame = ( find_game_by_index( index ) );
+         }
+
+         if( fgame == NULL )
+         {
+            if( send( player_sd, GAME_NOT_FOUND, 3, MSG_NOSIGNAL ) < 0 )
+	    {
+               printf( "Game not found.\n");
+            }
+         }
+         else
+         {
+            player->status = REQUESTING;
+
+            if( !game_accepted( fgame, player_sd, player->name ) )
+            {
+               if( fgame->join_reques )
+	       {
+		  if( send( player_sd, ANOTHER_PLAYER_REQUEST, 3, MSG_NOSIGNAL ) < 0 ) 
+		  {
+		     printf( "Another player request.\n" );
+		  }
+               }
+               else
+               {
+                  if( send( player_sd, JOIN_REQUEST_REJECTED, 3, MSG_NOSIGNAL ) < 0 )
+		  {
+		     printf( "Join request rejected.\n" );
+		  }
+               }
+            }
+            else
+            {
+               player->status = IN_GAME;
+	       pthread_mutex_lock( &( player->mutex_state ) );
+
+	       while( player->status == IN_GAME )
+	       {
+		  pthread_cond_wait( &( player->cv_status), &( player->mutex_state ) )
+
+	       }
+
+	       pthread_mutex_unlock( &( player->mutex_state ) );
+
+	       while( player->champion && !quit( player_sd ) )
+	       {
+		  struct GameNode *game = new_game( player->name, player_sd );
+
+		  if( game != NULL)
+		  {
+		     play_game( game );
+		     delete_game( game );
+		  }
+		  else
+		  {
+		     if( send( player_sd, CREATE_GAME_FAILED, 3, MSG_NOSIGNAL ) < 0 )
+		     {
+		        printf(" Rematch failed.\n");
+                     }
+		  }
+	       }
+	       if( send( player_sd, RETURN_LOBBY, 3, MSG_NOSIGNAL ) < 0 )
+	       {
+	          printf( "Returning to lobby because match failed.\n" );
+               }
+            }
+         }
+      }
+   }while( connected );
+}
+
+bool accept_game( struct GameNode *game, const int enemy_sd, const char *enemy_name )
+{
+   if( game->join_request )
+   {
+      return false;
+   }
+
+   const int owner_sd = game->owner_sd;
+   char buffer[ MAX_MESSAGE_SIZE ];
+   memset( buffer, 0, MAX_MESSAGE_SIZE );
+   strcat( buffer, 
+}
+
+struct GameNode* new_game( const char *owner_name, const int owner_sd )
+{
+   struct GameNode *game = ( struct GameNode * ) malloc( sizeof( struct GameNode ) );
+
+   if( game == NULL )
+   {
+      return NULL;
+   }
+
+   memset( game, 0, sizeof( struct GameNode ) );
+   strcpy( game->owner, owner_name );
+   game->owner_sd = owner_sd;
+   pthread_mutex_init( &( game->mutex_state ), NULL );
+   pthread_cond_init( &( game->cv_state ), NULL );
+   game->status = NEW_GAME;
+   game->join_request = false;
+   pthread_mutex_lock( &game_mutex );
+
+   game->next_node = game_head;
+
+   if( game_head != NULL && game_head->status == NEW_GAME )
+   {
+      game_head->status = WAITING;
+   }
+
+   game_head = game;
+   pthread_mutex_unlock( &game_mutex );
+
+   return game;
+}
+
+struct GameNode* find_game_by_player( const int player_sd )
+{
+   struct GameNode * game = game_head;
+
+   while( game != NULL )
+   {
+      if( game->owner_sd == player_sd || game->enemy_sd == player_sd )
+      {
+          return game;
+      }
+
+      game = game->next_node;
+
+   }
+
+   return NULL;
+
+}
+
+struct GameNode* find_game_by_index( const unsigned int index )
+{
+   unsigned int game_index = 0;
+   pthread_mutex_lock( &game_mutex );
+
+   struct GameNode *game = game_head;
+
+   while( game != NULL )
+   {
+      if( game->status == WAITING || game->status == NEW_GAME )
+      {
+         game_index++;
+      }
+
+      if( game_index == index )
+      {
+         pthread_mutex_unlock( &game_mutex );
+         return game;
+      }
+
+      game = game->next_node;
+
+   }
+
+   pthread_mutex_unlock( &game_mutex );
+   return NULL;
+
+}
+
+void delete_game( struct GameNode *game )
+{
+   pthread_mutex_lock( &game_mutex );
+
+   if( game != NULL && game_head == game )
+   {
+      game_head = game_head->next_node;
+      free( game );
+      //segnala_cambiamento_partite()
+   }
+   else if ( game != NULL )
+   {
+      struct GameNode *tmp = game_head->next_node;
+
+      while( tmp != NULL && tmp->next_node != game )
+      {
+         tmp = tmp->next_node;
+      }
+
+      if( tmp != NULL )
+      {
+         tmp->next_node = game->next_node;
+         free( game );
+         //segnala_cambiamento_partite();
+      }
+   }
+
+   pthread_mutex_unlock( &game_mutex );
+
 }
 
 bool match_accepted(struct GameNode *match, const int opponent, const char *name_opp)
@@ -497,5 +680,3 @@ bool quit(const int host)
     if (response == 'S') return false;
     else return true;
 }
-
-
