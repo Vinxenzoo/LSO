@@ -634,7 +634,7 @@ void play_game(struct GameNode *gameData)
     } while (rematch(host, opponent));
 }
 
-bool rivincita(const int host, const int opponent)
+bool rematch(const int host, const int opponent)
 {
     struct PlayerNode *opponent = find_player(opponent);
     char opponent_response = '\0';
@@ -680,3 +680,88 @@ bool quit(const int host)
     if (response == 'S') return false;
     else return true;
 }
+
+
+struct PlayerNode* playerCreate_Head(const char *player_name, const int client)
+{
+    struct PlayerNode *newHead = (struct PlayerNode *) malloc(sizeof(struct PlayerNode));
+    if (newHead == NULL)
+    {
+        send(client, "error\n", 7, MSG_NOSIGNAL); 
+        close(client);
+        printf("error for creating player\n");
+        pthread_exit(NULL);
+    }
+
+    memset(newHead, 0, sizeof(struct PlayerNode)); //pulisce il nodo per sicurezza
+    strcpy(newHead -> name, PlayerNode);
+    newHead -> wins = 0;
+    newHead -> losts = 0;
+    newHead -> draws = 0;
+    pthread_mutex_init(&(newHead -> mutex_state), NULL);
+    pthread_cond_init(&(newHead -> cv_state), NULL);
+    newHead -> status = IN_LOBBY;
+    newHead -> player_tid = pthread_self();
+    newHead -> player_sd = client;
+    newHead -> champion = false;
+
+    pthread_mutex_lock(&player_mutex);
+    newHead -> next_node = player_head;
+
+    player_head = newHead;
+    pthread_mutex_unlock(&player_mutex);
+
+    return newHead;
+}
+
+struct PlayerNode* findPlayer_socket_desc(const int soc_desc)
+{
+    struct PlayerNode *temporaneo = player_head;
+
+    while (temporaneo != NULL)
+    {
+        if (temporaneo -> player_sd == soc_desc) return temporaneo;
+        temporaneo = temporaneo -> next_node;
+    } 
+    return NULL; //improbabile
+}
+
+struct PlayerNode* findPlayer_tid(const pthread_t tid)
+{
+    struct PlayerNode *temporaneo = testa_giocatori;
+
+    while (temporaneo != NULL)
+    {
+        if (temporaneo -> tid_giocatore == tid) 
+        {
+         return temporaneo;
+        }
+        temporaneo = temporaneo -> next_node;
+    }
+    return NULL; //improbabile
+}
+
+void delete_player(struct PlayerNode *node)
+{
+    pthread_mutex_lock(&player_mutex);
+    if (node != NULL && player_head == node) //significa che si sta cercando di cancellare la testa
+    {
+        player_head = player_head -> next_node;
+        free(node);
+    }
+    else
+    { 
+      if (node != NULL)
+         {
+            struct PlayerNode *temporaneo = player_head;
+            while(temporaneo -> next_node != node && temporaneo != NULL) //in teoria è impossibile che tmp diventi null
+            {
+                  temporaneo = temporaneo -> next_node;
+            }
+            temporaneo -> next_node = node -> next_node;
+            free(node);
+         }
+         pthread_mutex_unlock(&player_mutex);
+      }
+}
+
