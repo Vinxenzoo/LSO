@@ -47,4 +47,9 @@ void play_game(struct GameNode *gameData);
 bool rematch(const int host, const int opponent);
 bool quit(const int player_sd);
 
+struct nodo_giocatore* crea_giocatore_in_testa(const char *nome_giocatore, const int client_sd);
+struct nodo_giocatore* trova_giocatore_da_sd(const int sd);
+struct nodo_giocatore* trova_giocatore_da_tid(const pthread_t tid);
+void cancella_giocatore(struct nodo_giocatore *nodo);
+
 #endif
