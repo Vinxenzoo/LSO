@@ -765,3 +765,169 @@ void delete_player(struct PlayerNode *node)
       }
 }
 
+
+void show_game_changement()
+{ 
+    const pthread_t sender_tid = pthread_self();
+    pthread_t recv_tid = 0;
+
+    //per essere sicuri che la testa non cambi nel frattempo
+    pthread_mutex_lock(&player_mutex);
+    struct PlayerNode *momentary = player_head;
+    pthread_mutex_unlock(&player_mutex);
+
+    while (momentary != NULL)
+    {
+        recv_tid = momentary -> sender_tid;
+        if (recv_tid != sender_tid && momentary -> status == IN_LOBBY) pthread_kill(recv_tid, SIGUSR1);
+        momentary = momentary -> next_node;
+    }
+}
+
+void error_handler(const int player)
+{
+    pthread_t thread_id = 0;
+    struct PlayerNode *player_tmp = findPlayer_socket_desc(player);
+    if (player_tmp != NULL) thread_id = player -> player_tid;
+    struct GameNode *match = find_game_by_player(player);
+
+    if (match != NULL) 
+    {
+        if (match -> status == RUNNING)
+        {   //le send non fanno error checking perchè in caso di errore si creerebbe una ricorsione infinita
+            if (player == match -> owner_sd) 
+            {
+                send(match -> enemy_sd, &ERROR, 1, MSG_NOSIGNAL);
+                struct PlayerNode *opponent = findPlayer_socket_desc(match -> enemy_sd);
+                if (opponent != NULL)
+                {
+                    opponent -> wins++;
+                    opponent -> champion = true;
+                    opponent -> status = REQUESTING;
+                    pthread_cond_signal(&(opponent -> cv_state));
+                }
+                delete_game(match); 
+            }
+            else send(match -> owner_sd, &ERROR, 1, MSG_NOSIGNAL);
+        }
+        else
+        {
+            delete_game(match); 
+        }
+    }
+    if (player != NULL) pthread_kill(tid, SIGALRM);
+}
+
+void sigalrm_h()
+{
+    struct PlayerNode *player = findPlayer_tid(pthread_self());
+    close(player -> player_sd);
+    cancella_giocatore(player);
+    pthread_exit(NULL);
+}
+
+void docker_SIGTERM_h()
+{
+    exit(EXIT_SUCCESS);
+}
+
+void send_game()
+{
+    struct PlayerNode *player = findPlayer_tid(pthread_self());
+    const int client = player -> player_sd;
+
+    pthread_mutex_lock(&game_mutex);
+    struct GameNode *momentary = game_head;
+
+    char buff_out[MAXOUT];
+    memset(buff_out, 0, MAXOUT);
+
+    int i = 0; //conta le partite a cui è possibile aggiungersi
+    char index_str[3]; //l'indice verrà convertito in questa stringa
+    memset(index_str, 0, 3);
+
+    char game_state[28];
+
+    if (momentary == NULL) {if (send(client, "\nthere aren't match actives now, write\"create\"for create ones \"esc\" to exit\n", 90, MSG_NOSIGNAL) < 0) err_handler(client);}
+    else
+    {
+        if (send(client, "\n\nMATCH LIST", 15, MSG_NOSIGNAL) < 0) err_handler(client);
+        while (momentary != NULL)
+        {
+            memset(buff_out, 0, MAXOUT);
+            memset(game_state, 0, 28);
+            switch (momentary -> status)
+            {
+                case NEW_CREATION:
+                    strcpy(game_state, "Create now\n");
+                    break;
+                case WAITING:
+                    strcpy(game_state, "waiting a player\n");
+                    break;
+                case RUNNING:
+                    strcpy(game_state, "Running a game\n");
+                    break;
+                case ENDED:
+                    strcpy(game_state, "Ended a game\n");
+                    break;
+            }
+            strcat(buff_out, momentary -> owner); strcat(buff_out, "\nmatch's "); 
+            strcat(buff_out, momentary -> enemy); strcat(buff_out, "\nAvversario: ");
+            strcat(buff_out, game_state); strcat(buff_out, "\nState's ");
+
+            if (momentary -> status == NEW_CREATION || momentary -> status== WAITING)
+            {
+                i++;
+                sprintf(index_str, "%u\n", I);
+                strcat(buff_out, "ID: "); strcat(buff_out, index_str);
+            }
+            if (send(client, buff_out, strlen(buff_out), MSG_NOSIGNAL) < 0) err_handler(client);
+
+            momentary = momentary -> next_node;
+        }
+        if (send(client, "\nUnisciti a una partita in attesa scrivendo il relativo ID, scrivi \"crea\" per crearne una o \"esci\" per uscire\n", 110, MSG_NOSIGNAL) < 0) err_handler(client);
+    }
+    pthread_mutex_unlock(&game_mutex);
+}
+
+
+void show_new_player()
+{
+    //per essere sicuri che la testa non cambi nel frattempo
+    pthread_mutex_lock(&player_mutex);
+    struct PlayerNode *momentary = player_head;
+    pthread_mutex_unlock(&player_mutex);
+
+    const pthread_t sender_tid = pthread_self();
+    pthread_t recv_tid = 0;
+
+    while (momentary != NULL)
+    {
+        recv_tid = momentary -> sender_tid;
+        if (recv_tid != sender_tid && (momentary -> status == IN_LOBBY)) pthread_kill(recv_tid, SIGUSR2);
+        momentary = momentary -> next_node;
+    }
+}
+
+void handler_newPlayer()
+{
+    pthread_mutex_lock(&player_mutex);
+    struct PlayerNode *momentary = player_head;
+    pthread_mutex_unlock(&player_mutex);
+
+    char mess[MAXOUT];
+    memset(mess, 0, MAXOUT);
+    if (momentary != NULL) //controllo teoricamente inutile
+    {
+        strcat(mess, momentary -> name); 
+        strcat(mess, " is just entered in lobby!\n");
+
+        struct PlayerNode *player = findPlayer_tid(pthread_self());
+
+        if (send(player -> player_sd, mess, strlen(mess), MSG_NOSIGNAL) < 0) err_handler(player -> player_sd);
+    }
+}
+
+
+
+

@@ -38,7 +38,6 @@ struct GameNode *game_head;
 pthread_mutex_t player_mutex;
 pthread_mutex_t game_mutex;
 
-//funzione che gestisce il ciclo di vita di un giocatore
 void lobby(struct PlayerNode *player_data);
 //se il proprietario accetta la richiesta di unione alla partita inserisce i dati dell'avversario nel nodo partita e restituisce vero, falso altrimenti
 bool match_accepted(struct GameNode *match, const int opponent, const char *opponent_name);
@@ -47,9 +46,18 @@ void play_game(struct GameNode *gameData);
 bool rematch(const int host, const int opponent);
 bool quit(const int player_sd);
 
-struct nodo_giocatore* crea_giocatore_in_testa(const char *nome_giocatore, const int client_sd);
-struct nodo_giocatore* trova_giocatore_da_sd(const int sd);
-struct nodo_giocatore* trova_giocatore_da_tid(const pthread_t tid);
-void cancella_giocatore(struct nodo_giocatore *nodo);
+struct PlayerNode* playerCreate_Head(const char *player_name, const int client);
+struct PlayerNode* findPlayer_socket_desc(const int soc_desc)
+struct PlayerNode* findPlayer_tid(const pthread_t tid);
+void delete_player(struct PlayerNode *node);
+
+
+void err_handler(const int player);
+void sigalrm_h();
+void docker_SIGTERM_h();
+void show_game_changement();
+void send_game();
+void show_new_player()
+void handler_newPlayer();
 
 #endif
