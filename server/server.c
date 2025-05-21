@@ -565,7 +565,7 @@ bool match_accepted(struct GameNode *match, const int opponent, const char *name
         if (send(opponent, "*** starting match by opponent***\n", 42, MSG_NOSIGNAL) < 0) err_handler(opponent);
         if (match != NULL)
         {
-            match -> status  = IN_GAME;
+            match -> status  =  RUNNING;
             match -> join_request = false;
             pthread_cond_signal(&(match -> cv_state));
         }
@@ -616,12 +616,13 @@ void play_game(struct GameNode *gameData)
     {
         gameData -> status = RUNNING;
         round++;
-        sign_change_game();
+        show_game_changement();
 
         bool err = false; //rappresenta un errore di disconnesione
         char play = '\0';
-        char host_result = NONE; //il codice del client cambia il valore di questa variabile quando la partita finisce
-        char opponent_result = NONE;
+        enum game_result host_result = NONE; //il codice del client cambia il valore di questa variabile quando la partita finisce
+        enum game_result opponent_result = NONE; // oppure altro valore iniziale
+
         //'0' = ancora in corso '1' = vince proprietario, '2' = vince avversario, '3' = pareggio
 
         //inizia la partita
@@ -634,14 +635,14 @@ void play_game(struct GameNode *gameData)
                 //inizia il proprietario
                 if (recv(host, &play, 1, 0) <= 0) {err_handler(host); }
                 if (recv(host, &host_result, 1, 0) <= 0) {err_handler(host); }
-                if (send(opponent, NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
+                if (send(opponent, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (host_result != NONE) break;
 
                 //turno dell'avversario
                 if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
                 if (recv(opponent, &opponent_result, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
-                if (send(host, NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
+                if (send(host, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
                 if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
             }
             else 
@@ -649,14 +650,14 @@ void play_game(struct GameNode *gameData)
                 //inizia l'avversario
                 if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
                 if (recv(opponent, &opponent_result, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
-                if (send(host, NOERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
+                if (send(host, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
                 if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
                 if (opponent_result != NONE) break;
 
                 //turno del proprietario
                 if (recv(host, &play, 1, 0) <= 0) {err_handler(host); }
                 if (recv(host, &host_result, 1, 0) <= 0) {err_handler(host); }
-                if (send(opponent, NOERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
+                if (send(opponent, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
             }
         } while (host_result == NONE && opponent_result == NONE);
@@ -695,7 +696,7 @@ void play_game(struct GameNode *gameData)
         opponent_struct -> draws++;
 
         gameData -> status = END_GAME;
-        sign_change_game();
+        show_game_changement();
 
     //partita finita, rimane in stato terminata finchè la rivincita viene accettata o rifiutata
     } while (rematch(host, opponent));
@@ -864,7 +865,7 @@ void err_handler(const int player)
         {   //le send non fanno error checking perchè in caso di errore si creerebbe una ricorsione infinita
             if (player == match -> owner_sd) 
             {
-                send(match -> enemy_sd, ERROR, 1, MSG_NOSIGNAL);
+                send(match -> enemy_sd, &ERROR, 1, MSG_NOSIGNAL);
                 struct PlayerNode *opponent = findPlayer_socket_desc(match -> enemy_sd);
                 if (opponent != NULL)
                 {
