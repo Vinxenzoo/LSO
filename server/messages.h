@@ -21,6 +21,12 @@
 #define RETURN_LOBBY "35\n"
 #define JOIN_REQUEST_REJECTED "37\n"
 #define ANOTHER_PLAYER_REQUEST "38\n"
+#define WAITING_OWNER_RESPONSE "39\n"
+
+#define STARTING_GAME_OWNER "3A\n";
+#define STARTING_GAME_ENEMY "3B\n";
+#define REQUEST_DENIED "3C\n";
+
 
 //Client
 #define EXIT "51\n"

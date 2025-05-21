@@ -15,7 +15,7 @@
 
 #define PORT 8080
 
-Server init_server();
+Server server_init();
 
 void* player_thread( void *sd );
 
@@ -38,21 +38,20 @@ struct GameNode *game_head;
 pthread_mutex_t player_mutex;
 pthread_mutex_t game_mutex;
 
-void lobby(struct PlayerNode *player_data);
 //se il proprietario accetta la richiesta di unione alla partita inserisce i dati dell'avversario nel nodo partita e restituisce vero, falso altrimenti
-bool match_accepted(struct GameNode *match, const int opponent, const char *opponent_name);
+bool match_accepted(struct GameNode *, const int , const char *);
 
-void play_game(struct GameNode *gameData);
-bool rematch(const int host, const int opponent);
-bool quit(const int player_sd);
+void play_game(struct GameNode *);
+bool rematch(const int , const int );
+bool quit(const int );
 
-struct PlayerNode* playerCreate_Head(const char *player_name, const int client);
-struct PlayerNode* findPlayer_socket_desc(const int soc_desc)
-struct PlayerNode* findPlayer_tid(const pthread_t tid);
-void delete_player(struct PlayerNode *node);
+struct PlayerNode* playerCreate_Head(const char *, const int );
+struct PlayerNode* findPlayer_socket_desc(const int )
+struct PlayerNode* findPlayer_tid(const pthread_t );
+void delete_player(struct PlayerNode *);
 
 
-void err_handler(const int player);
+void err_handler(const int );
 void sigalrm_h();
 void docker_SIGTERM_h();
 void show_game_changement();

@@ -42,9 +42,12 @@ void* player_thread( void *sd )
 {
    const int player_sd = *( ( int * ) sd );
    struct PlayerNode *player = register_player( player_sd );
-
+   show_new_player();
    player_lobby();
 
+   close( player_sd );
+   delete_player( player );
+   pthread_exit( NULL );
 }
 
 
@@ -220,8 +223,11 @@ void lobby_handler( struct PlayerNode *player )
 
       if( send( player_sd, out_buffer, strlen( out_buffer ), MSG_NOSIGNAL ) < 0 )
       {
+         err_handler( player_sd );
          printf( "Error sending stats.\n" );
       }
+
+      send_game();
 
       do
       {
@@ -230,7 +236,8 @@ void lobby_handler( struct PlayerNode *player )
             errno = 0; //Avoid not expected failures
          }
          if( recv( player_sd, in_buffer, MAX_MESSAGE_SIZE, 0 ) <= 0 && errno != EINTR )
-	 {
+	      {
+            err_handler( player_sd );
             printf("Generic Error in Lobby.\n");
          }
       }while( errno == EINTR );
@@ -254,13 +261,15 @@ void lobby_handler( struct PlayerNode *player )
             {
                if( send( player_sd, CREATE_GAME_FAILED, 3, MSG_NOSIGNAL ) < 0 )
                {
-	          printf( "Game creation failed.\n" );
+                  err_handler( player_sd );
+	               printf( "Game creation failed.\n" );
                }
             }
-         } while( player->champion && !quit( player_sd );
+         } while( player->champion && !quit( player_sd ) );
 
          if( send( player_sd, RETURN_LOBBY, 3, MSG_NOSIGNAL ) < 0 )
          {
+            err_handler( player_sd );
             printf( "Return to lobby failed.\n" );
          }
       }
@@ -277,7 +286,8 @@ void lobby_handler( struct PlayerNode *player )
          if( fgame == NULL )
          {
             if( send( player_sd, GAME_NOT_FOUND, 3, MSG_NOSIGNAL ) < 0 )
-	    {
+	         {
+               err_handler( player_sd );
                printf( "Game not found.\n");
             }
          }
@@ -287,55 +297,60 @@ void lobby_handler( struct PlayerNode *player )
 
             if( !game_accepted( fgame, player_sd, player->name ) )
             {
-               if( fgame->join_reques )
-	       {
-		  if( send( player_sd, ANOTHER_PLAYER_REQUEST, 3, MSG_NOSIGNAL ) < 0 ) 
-		  {
-		     printf( "Another player request.\n" );
-		  }
+               if( fgame->join_request )
+               {
+                  if( send( player_sd, ANOTHER_PLAYER_REQUEST, 3, MSG_NOSIGNAL ) < 0 ) 
+                  {
+                     err_handler( player_sd );
+                     printf( "Another player request.\n" );
+                  }
                }
                else
                {
                   if( send( player_sd, JOIN_REQUEST_REJECTED, 3, MSG_NOSIGNAL ) < 0 )
-		  {
-		     printf( "Join request rejected.\n" );
-		  }
+                  {
+                     err_handler( player_sd );
+                     printf( "Join request rejected.\n" );
+                  }
                }
             }
             else
             {
                player->status = IN_GAME;
-	       pthread_mutex_lock( &( player->mutex_state ) );
+	            pthread_mutex_lock( &( player->mutex_state ) );
 
-	       while( player->status == IN_GAME )
-	       {
-		  pthread_cond_wait( &( player->cv_status), &( player->mutex_state ) )
+	            while( player->status == IN_GAME )
+	            {
+		            pthread_cond_wait( &( player->cv_status), &( player->mutex_state ) );
+	            }
 
-	       }
+	            pthread_mutex_unlock( &( player->mutex_state ) );
 
-	       pthread_mutex_unlock( &( player->mutex_state ) );
+	            while( player->champion && !quit( player_sd ) )
+	            {
+		            struct GameNode *game = new_game( player->name, player_sd );
 
-	       while( player->champion && !quit( player_sd ) )
-	       {
-		  struct GameNode *game = new_game( player->name, player_sd );
-
-		  if( game != NULL)
-		  {
-		     play_game( game );
-		     delete_game( game );
-		  }
-		  else
-		  {
-		     if( send( player_sd, CREATE_GAME_FAILED, 3, MSG_NOSIGNAL ) < 0 )
-		     {
-		        printf(" Rematch failed.\n");
+                  if( game != NULL)
+                  {
+                     play_game( game );
+                     delete_game( game );
+                  }
+                  else
+                  {
+                     if( send( player_sd, CREATE_GAME_FAILED, 3, MSG_NOSIGNAL ) < 0 )
+                     {
+                        err_handler( player_sd );
+                        printf(" Rematch failed.\n");
                      }
-		  }
-	       }
-	       if( send( player_sd, RETURN_LOBBY, 3, MSG_NOSIGNAL ) < 0 )
-	       {
-	          printf( "Returning to lobby because match failed.\n" );
-               }
+                  }
+
+                  if( send( player_sd, RETURN_LOBBY, 3, MSG_NOSIGNAL ) < 0 )
+                  {
+                     err_handler( player_sd );
+                     printf( "Returning to lobby because match failed.\n" );
+                  }
+
+	            }
             }
          }
       }
@@ -352,7 +367,59 @@ bool accept_game( struct GameNode *game, const int enemy_sd, const char *enemy_n
    const int owner_sd = game->owner_sd;
    char buffer[ MAX_MESSAGE_SIZE ];
    memset( buffer, 0, MAX_MESSAGE_SIZE );
-   strcat( buffer, 
+   strcat( buffer, "r" );
+   strcat( buffer, enemy_name );
+   strcat( buffer, "\n");
+
+   char response = "\0";
+
+   if( send( enemy_sd, WAITING_OWNER_RESPONSE, 3, MSG_NOSIGNAL ) < 0 )
+   {
+      err_handler( owner_sd );
+      return false;
+   }
+   if( recv( owner_sd, &response, 1, 0) <= 0 )
+   {
+      err_handler( owner_sd );
+      return false;
+   }
+
+   if( risposta == "S" )
+   {
+      strcpy( game->enemy, enemy_name );
+      game->enemy_sd = enemy_sd;
+
+      if( send( owner_sd, STARTING_GAME_OWNER, 3, MSG_NO_SIGNAL) < 0 )
+      {
+         err_handler( owner_sd );
+      }
+      if( send( owner_sd, STARTING_GAME_ENEMY, 3, MSG_NO_SIGNAL) < 0 )
+      {
+         err_handler( enemy_sd );
+      }
+      if( game != NULL )
+      {
+         game->status = RUNNING;
+         game->join_request = false;
+         pthread_cond_signal( &( game->cv_state ) );
+      }
+      
+      return true;
+
+   }
+   else
+   {
+      if( send( owner_sd, REQUEST_DENIED, 3, MSG_NOSIGNAL ) )
+      {
+         err_handler( owner_sd );
+      }
+
+      game->join_request = false;
+   
+   }
+
+   return false;
+
 }
 
 struct GameNode* new_game( const char *owner_name, const int owner_sd )
@@ -442,7 +509,7 @@ void delete_game( struct GameNode *game )
    {
       game_head = game_head->next_node;
       free( game );
-      //segnala_cambiamento_partite()
+      show_game_changement();
    }
    else if ( game != NULL )
    {
@@ -457,7 +524,7 @@ void delete_game( struct GameNode *game )
       {
          tmp->next_node = game->next_node;
          free( game );
-         //segnala_cambiamento_partite();
+         show_game_changement();
       }
    }
 
@@ -468,46 +535,46 @@ void delete_game( struct GameNode *game )
 bool match_accepted(struct GameNode *match, const int opponent, const char *name_opp)
 {
     if (match -> union == true) return false;
-    const int host = match -> host;
+    const int host = match -> owner_sd;
     char buf[MAXOUT];
     memset(buf, 0, MAXOUT);
     strcat(buf, name_opp); strcat(buf, " want match at your game, Do you accept? [s/n]\n");
 
     char response = '\0'; //si occupa il codice client di verificare l'input
 
-    if (send(opponent, "attend host...\n", 30, MSG_NOSIGNAL) < 0) error_handler(opponent);
-    partita -> richiesta_unione = true;
+    if (send(opponent, "attend host...\n", 30, MSG_NOSIGNAL) < 0) err_handler(opponent);
+    match -> join_request = true;
 
     if (send(opponent, buf, strlen(buf), MSG_NOSIGNAL) < 0) 
     {
-        error_handler(host);
+        err_handler(host);
         return false;
     }
     if (recv(host, &esponse, 1, 0) <= 0)
     {
-        error_handler(opponent);
+        err_handler(opponent);
         return false;
     }
 
     resp = toupper(res); //case insensitive
     if (res == 'S')
     {
-        strcpy(match -> opponent, name_opp);
-        match -> opponent = opponent;
-        if (send(host, "*** starting match by host***\n", 44, MSG_NOSIGNAL) < 0) error_handler(host);
-        if (send(opponent, "*** starting match by opponent***\n", 42, MSG_NOSIGNAL) < 0) error_handler(sd_avversario);
+        strcpy(match -> enemy_sd, name_opp);
+        match -> enemy_sd = opponent;
+        if (send(host, "*** starting match by host***\n", 44, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (send(opponent, "*** starting match by opponent***\n", 42, MSG_NOSIGNAL) < 0) err_handler(sd_avversario);
         if (match != NULL)
         {
-            match -> status = IN_GAME;
-            match -> union = false;
+            match -> status  = IN_GAME;
+            match -> join_request = false;
             pthread_cond_signal(&(match -> stato_cv));
         }
         return true;
     }
     else
     {
-        if (send(host, "Request refused, searching another opponent...\n", 51, MSG_NOSIGNAL) < 0) error_handler(player);
-        match -> union = false;
+        if (send(host, "Request refused, searching another opponent...\n", 51, MSG_NOSIGNAL) < 0) err_handler(player);
+        match -> join_request = false;
     }
     return false;
 }
@@ -515,15 +582,15 @@ bool match_accepted(struct GameNode *match, const int opponent, const char *name
 
 void play_game(struct GameNode *gameData)
 {
-    const int host = gameData -> host;
-    struct nodo_giocatore *host = trova_giocatore_da_sd(host);
-    players -> status = IN_GAME;
-    players -> champion = true;
-    if (send(host, "waiting opponent...\n", 30, MSG_NOSIGNAL) < 0) error_handler(host);
-    segnala_cambiamento_partite();
+    const int host = gameData -> owner_sd;
+    struct PlayerNode *owner = findPlayer_socket_desc(host);
+    owner -> status = IN_GAME;
+    owner -> champion = true;
+    if (send(host, "waiting opponent...\n", 30, MSG_NOSIGNAL) < 0) err_handler(host);
+    show_game_changement();
 
     pthread_mutex_lock(&(gameData -> mutex_state));
-    while (gameData -> status != Running)
+    while (gameData -> status != RUNNING )
     {
         //controllo periodico in caso il proprietario si disconnetta mentre la partita è in attesa
         struct timespec waiting_time;
@@ -534,16 +601,16 @@ void play_game(struct GameNode *gameData)
         if (all_results  == ETIMEDOUT) 
         { 
             //messaggio nullo che controlla se la socket è ancora attiva
-            if (send(,host "\0", 1, MSG_NOSIGNAL) < 0) error_handler(host);
+            if (send(host, "\0", 1, MSG_NOSIGNAL) < 0) err_handler(host);
         }
     }
     pthread_mutex_unlock(&(gameData -> mutex_state));
 
-    const int opponent = gameData -> opponent;
-    struct PlayerNode *opponentt = trova_giocatore_da_sd(opponent);
-    opponentt -> champion = false;
+    const int opponent = gameData -> enemy_sd;
+    struct PlayerNode *opponent_struct = findPlayer_socket_desc(opponent);
+    opponent_struct -> champion = false;
 
-    int round = 0;
+   unsigned int round = 0;
 
     do //si esce dal ciclo quando viene rifiutata la rivincita o se non c'è un pareggio
     {
@@ -565,67 +632,67 @@ void play_game(struct GameNode *gameData)
             if (round%2 != 0)
             {
                 //inizia il proprietario
-                if (recv(host, &play, 1, 0) <= 0) {error_handler(host); }
-                if (recv(host, &host_result, 1, 0) <= 0) {error_handler(host); }
-                if (send(opponent, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
-                if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
+                if (recv(host, &play, 1, 0) <= 0) {err_handler(host); }
+                if (recv(host, &host_result, 1, 0) <= 0) {err_handler(host); }
+                if (send(opponent, &NOERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
+                if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (host_result != NONE) break;
 
                 //turno dell'avversario
-                if (recv(opponent, &play, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
-                if (recv(opponent, &opponent_result, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
-                if (send(host, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
-                if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
+                if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
+                if (recv(opponent, &opponent_result, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
+                if (send(host, &NOERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
+                if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
             }
             else 
             {
                 //inizia l'avversario
-                if (recv(opponent, &play, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
-                if (recv(opponent, &opponent_result, 1, 0) <= 0) {error_handler(opponent); err = true; break;}
-                if (send(host, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
-                if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(host); }
+                if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
+                if (recv(opponent, &opponent_result, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
+                if (send(host, &NOERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
+                if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
                 if (opponent_result != NESSUNO) break;
 
                 //turno del proprietario
-                if (recv(host, &play, 1, 0) <= 0) {error_handler(host); }
-                if (recv(host, &host_result, 1, 0) <= 0) {error_handler(host); }
-                if (send(opponent, &NOERROR, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
-                if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {error_handler(opponent); err = true; break;}
+                if (recv(host, &play, 1, 0) <= 0) {err_handler(host); }
+                if (recv(host, &host_result, 1, 0) <= 0) {err_handler(host); }
+                if (send(opponent, &NOERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
+                if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
             }
         } while (host_result == NONE && opponent_result == NONE);
 
         //in caso di errore si aggiornano le vittorie e si esce dalla partita
         if (err) 
         {
-            host -> wins++;
-            host -> champion = true;
+            owner -> wins++;
+            owner -> champion = true;
             break;
         }
 
         //si aggiornano i contatori dei giocatori
         if (host_result == WIN || opponent_result == LOSE)
         {
-            host -> wins++;
-            opponent -> losts++;
-            host -> champion = true;
-            opponent -> champion = false;
-            opponent -> status = IN_LOBBY;
-            pthread_cond_signal(&(opponent -> cv_state));
+            owner -> wins++;
+            opponent_struct -> losts++;
+            owner -> champion = true;
+            opponent_struct -> champion = false;
+            opponent_struct -> status = IN_LOBBY;
+            pthread_cond_signal(&(opponent_struct -> cv_state));
             break;
         }
         else if (host_result == LOSE || opponent_result == WIN)
         {
-            host -> losts++;
-            opponent -> wins++;
-            host -> champion = false;
-            opponent -> champion = true;
-            opponent -> status = REQUESTING;
-            pthread_cond_signal(&(opponent -> cv_state));
+            owner -> losts++;
+            opponent_struct -> wins++;
+            owner -> champion = false;
+            opponent_struct -> champion = true;
+            opponent_struct -> status = REQUESTING;
+            pthread_cond_signal(&(opponent_struct -> cv_state));
             break;
         }
 
-        host -> draws++;
-        opponent -> draws++;
+        owner -> draws++;
+        opponent_struct -> draws++;
 
         gameData -> status = END_GAME;
         sign_change_game();
@@ -634,27 +701,27 @@ void play_game(struct GameNode *gameData)
     } while (rematch(host, opponent));
 }
 
-bool rematch(const int host, const int opponent)
+bool rematch(const int host, const int opponent_sd)
 {
-    struct PlayerNode *opponent = find_player(opponent);
+    struct PlayerNode *opponent = findPlayer_socket_desc(opponent_sd);
     char opponent_response = '\0';
     char host_response = '\0';
 
-    if (send(opponent, "Rematch? [s/n]\n", 17, MSG_NOSIGNAL) < 0) error_handler(opponent);
-    if (recv(opponent, &opponent_response, 1, 0) <= 0) error_handler(opponent);
+    if (send(opponent_sd, "Rematch? [s/n]\n", 17, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+    if (recv(opponent_sd, &opponent_response, 1, 0) <= 0) err_handler(opponent_sd);
     
-    if (opponent_response != 'S') {if (send(host, "Rematch refused\n", 36, MSG_NOSIGNAL) < 0) error_handler(host);}
+    if (opponent_response != 'S') {if (send(host, "Rematch refused\n", 36, MSG_NOSIGNAL) < 0) err_handler(host);}
     else //avversario vuole rivincita
     {
-        if (send(opponent, "Waiting host...\n", 30, MSG_NOSIGNAL) < 0) error_handler(opponent);
-        if (send(host, "do you want a rematch? [s/n]\n", 48, MSG_NOSIGNAL) < 0) error_handler(host);
-        if (recv(host, &host_response, 1, 0) <= 0) error_handler(host);
+        if (send(opponent_sd, "Waiting host...\n", 30, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+        if (send(host, "do you want a rematch? [s/n]\n", 48, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (recv(host, &host_response, 1, 0) <= 0) err_handler(host);
     }
     if (host_response != 'S') //si torna alla lobby
     {
         if (host_response == 'N')
         {
-            if (send(opponent, "Rematch refused\n", 37, MSG_NOSIGNAL) < 0) error_handler(opponent);
+            if (send(opponent_sd, "Rematch refused\n", 37, MSG_NOSIGNAL) < 0) err_handler(opponent);
         }
         if (opponent != NULL)
         {
@@ -665,8 +732,8 @@ bool rematch(const int host, const int opponent)
     }
     else
     {
-        if (send(opponent, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) error_handler(opponent);
-        if (send(host, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) error_handler(host);
+        if (send(opponent_sd, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+        if (send(host, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) err_handler(host);
         return true;
     }
 }
@@ -674,8 +741,8 @@ bool rematch(const int host, const int opponent)
 bool quit(const int host)
 {
     char response = '\0';
-    if (send(host, "Do ypu want to accept another player? [s/n]\n", 40, MSG_NOSIGNAL) < 0) error_handler(host);
-    if (recv(host, &response, 1, 0) <= 0) error_handler(host);
+    if (send(host, "Do ypu want to accept another player? [s/n]\n", 40, MSG_NOSIGNAL) < 0) err_handler(host);
+    if (recv(host, &response, 1, 0) <= 0) err_handler(host);
     response = toupper(response);
     if (response == 'S') return false;
     else return true;
@@ -784,7 +851,7 @@ void show_game_changement()
     }
 }
 
-void error_handler(const int player)
+void err_handler(const int player)
 {
     pthread_t thread_id = 0;
     struct PlayerNode *player_tmp = findPlayer_socket_desc(player);
