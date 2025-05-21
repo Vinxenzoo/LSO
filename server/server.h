@@ -46,7 +46,7 @@ bool rematch(const int , const int );
 bool quit(const int );
 
 struct PlayerNode* playerCreate_Head(const char *, const int );
-struct PlayerNode* findPlayer_socket_desc(const int )
+struct PlayerNode* findPlayer_socket_desc(const int );
 struct PlayerNode* findPlayer_tid(const pthread_t );
 void delete_player(struct PlayerNode *);
 
@@ -56,7 +56,7 @@ void sigalrm_h();
 void docker_SIGTERM_h();
 void show_game_changement();
 void send_game();
-void show_new_player()
+void show_new_player();
 void handler_newPlayer();
 
 #endif
