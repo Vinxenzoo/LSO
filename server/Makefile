@@ -6,8 +6,8 @@ CFLAGS  := -Wall -Wextra -O3
 TARGET  := server
 
 # Lista dei file oggetto
-SOURCES := main.c funzioni.c
-HEADERS := funzioni.h strutturedati.h
+SOURCES := main.c server.c
+HEADERS := server.h datastructure.h
 OBJECTS := $(SOURCES:.c=.o)
 
 # Regola principale

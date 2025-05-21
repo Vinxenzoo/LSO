@@ -15,6 +15,9 @@
 
 #define PORT 8080
 
+const char NO_ERROR; 
+const char ERROR; 
+
 Server server_init();
 
 void* player_thread( void *sd );
