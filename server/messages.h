@@ -17,15 +17,16 @@
 #define REGISTRATION_COMPLETED "23\n"
 
 #define CREATE_GAME_FAILED "30\n"
+#define GAME_NOT_FOUND "33\n"
 #define GAME_FOUND "34\n"
 #define RETURN_LOBBY "35\n"
 #define JOIN_REQUEST_REJECTED "37\n"
 #define ANOTHER_PLAYER_REQUEST "38\n"
 #define WAITING_OWNER_RESPONSE "39\n"
 
-#define STARTING_GAME_OWNER "3A\n";
-#define STARTING_GAME_ENEMY "3B\n";
-#define REQUEST_DENIED "3C\n";
+#define STARTING_GAME_OWNER "3A\n"
+#define STARTING_GAME_ENEMY "3B\n"
+#define REQUEST_DENIED "3C\n"
 
 
 //Client
