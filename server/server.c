@@ -538,7 +538,7 @@ bool match_accepted(struct GameNode *match, const int opponent, const char *name
     const int host = match -> owner_sd;
     char buf[MAX_MESSAGE_SIZE];
     memset(buf, 0, MAX_MESSAGE_SIZE);
-    strcat(buf, name_opp); strcat(buf, " want match at your game, Do you accept? [s/n]\n");
+    strcat(buf, name_opp); strcat(buf, "Do you accept? [s/n]\n");
 
     char response = '\0'; //si occupa il codice client di verificare l'input
 
@@ -988,7 +988,7 @@ void handler_newPlayer()
     if (momentary != NULL) //controllo teoricamente inutile
     {
         strcat(mess, momentary -> name); 
-        strcat(mess, " is just entered in lobby!\n");
+        strcat(mess, "entered lobby!\n");
 
         struct PlayerNode *player = findPlayer_tid(pthread_self());
 
