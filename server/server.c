@@ -6,13 +6,13 @@ Server server_init()
    newServer.opt = 1;
    newServer.addrlen = sizeof(struct sockaddr_in); 
 
-   if( ( newServer.fd = socket( AF_INET, SOCK_STREAM, 0 ) ) < 0 )  //Domain=Address Family(ip+port), Type=BydirectionalConnection Protocol=Default Protocol
+   if( ( newServer.sd = socket( AF_INET, SOCK_STREAM, 0 ) ) < 0 )  //Domain=Address Family(ip+port), Type=BydirectionalConnection Protocol=Default Protocol
    {
       perror( "Socket creation failed" );
       exit( EXIT_FAILURE );
    }
 
-   if( setsockopt( newServer.fd , SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &newServer.opt, sizeof( newServer.opt ) ) ) //SocketDescriptor, ProtocolLevel=SocketLevel, OptionName=ReuseLocalAddresses||ReuseLocalPort, OptionValue=true(1), Size=SizeOfOpt
+   if( setsockopt( newServer.sd , SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &newServer.opt, sizeof( newServer.opt ) ) ) //SocketDescriptor, ProtocolLevel=SocketLevel, OptionName=ReuseLocalAddresses||ReuseLocalPort, OptionValue=true(1), Size=SizeOfOpt
    {
       perror( "Socket setting options failed.");
       exit( EXIT_FAILURE );
@@ -22,13 +22,13 @@ Server server_init()
    newServer.address.sin_addr.s_addr = INADDR_ANY; //Ip address of the socket: with INADDR_ANY, it will accept all incoming addresses
    newServer.address.sin_port = htons ( PORT ); //htons convert the number 8080 from host to network byte order
 
-   if( bind( newServer.fd, ( struct sockaddr* ) &newServer.address, sizeof( newServer.address ) ) < 0 )
+   if( bind( newServer.sd, ( struct sockaddr* ) &newServer.address, sizeof( newServer.address ) ) < 0 )
    {
       perror( "Socket bind failed.");
       exit( EXIT_FAILURE );
    }
 
-   if( listen( newServer.fd, 3 ) < 0) 
+   if( listen( newServer.sd, 3 ) < 0) 
    {
       perror( "Socket listen failed." );
       exit( EXIT_FAILURE );

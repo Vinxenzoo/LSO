@@ -3,7 +3,7 @@
 
 int main()
 {
-    int sd = server_init();
+    Server server = server_init();
     printf( "Server running on port 8080.\n" );
 
     int client_sd;
@@ -12,7 +12,7 @@ int main()
 
     pthread_attr_t attr_thread;
     pthread_attr_init( &attr_thread );
-    pthread_attr_setdetachstate( &attr_thread, PTHREAD_CREATE_DETATCHED );
+    pthread_attr_setdetachstate( &attr_thread, PTHREAD_CREATE_DETACHED );
 
     struct sigaction *sig_action = ( struct sigaction * ) malloc( sizeof( struct sigaction ) );
     memset( sig_action, 0, sizeof( struct sigaction ) );
@@ -22,13 +22,13 @@ int main()
     sigaction( SIGUSR1, sig_action, NULL );
     sig_action->sa_handler = handler_newPlayer;
     sigaction( SIGUSR2, sig_action, NULL );
-    signal( SIGALRM, sigalrm_handler );
-    signal( SIGTERM, SIGTERM_HANDLER );
+    signal( SIGALRM, sigalrm_h );
+    signal( SIGTERM, docker_SIGTERM_h );
     free( sig_action );
 
     while( true )
     {
-        if( ( client_sd = accept( sd, ( struct sockaddr * ) &client_address, &address_lenght ) ) < 0 )
+        if( ( client_sd = accept( server.sd, ( struct sockaddr * ) &client_address, &address_lenght ) ) < 0 )
         {
             perror( "Error accepted.\n" );
             continue;
