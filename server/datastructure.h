@@ -38,7 +38,7 @@ enum player_status
 
 typedef struct ServerStruct //Pascal Case
 {
-    int fd;
+    int sd;
     socklen_t addrlen;
     struct sockaddr_in address;
     unsigned short int opt;

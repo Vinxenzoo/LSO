@@ -5,7 +5,7 @@
 //Server
 #define SERVER_ERROR "01\n"
 
-#define VICTORY "\n1A\n"
+#define VICTORY_M "\n1A\n"
 #define LOST    "\n1B\n"
 #define DRAW    "\n1C\n"
 
