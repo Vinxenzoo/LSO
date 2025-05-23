@@ -11,7 +11,7 @@
 #include <stdbool.h>
 
 #define  MAX_NAME_PLAYER 20
-#define  MAX_MESSAGE_SIZE 22
+#define  MAX_MESSAGE_SIZE 128
 
 enum game_status
 {

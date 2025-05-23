@@ -3,7 +3,8 @@ services:
     build:
       context: ./Server  #Contesto di build per il server (cartella server/)
     container_name: server
-
+    stdin_open: true
+    tty: true
   client:
     build:
       context: ./Client  #Contesto di build per il client (cartella client/)
