@@ -1,9 +1,18 @@
 #include "server.h"
 
+pthread_mutex_t player_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t game_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct PlayerNode *player_head = NULL;
+struct GameNode *game_head = NULL;
+
+char ERROR = '1';
+char NO_ERROR = '0';
 
 int main()
 {
-    Server server = server_init();
+    //Server server = server_init();
+    int sd = inizializza_server();
     printf( "Server running on port 8080.\n" );
 
     int client_sd;
@@ -28,7 +37,7 @@ int main()
 
     while( true )
     {
-        if( ( client_sd = accept( server.sd, ( struct sockaddr * ) &client_address, &address_lenght ) ) < 0 )
+        if( ( client_sd = accept( sd, ( struct sockaddr * ) &client_address, &address_lenght ) ) < 0 )
         {
             perror( "Error accepted.\n" );
             continue;

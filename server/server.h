@@ -15,10 +15,19 @@
 
 #define PORT 8080
 
+/*
 const char NO_ERROR; 
 const char ERROR; 
 
-Server server_init();
+pthread_mutex_t player_mutex;
+pthread_mutex_t game_mutex;
+
+struct PlayerNode *player_head;
+struct GameNode *game_head;
+*/
+
+//Server server_init();
+int inizializza_server();
 
 void* player_thread( void *sd );
 
@@ -34,12 +43,6 @@ struct GameNode* new_game( const char*, const int );
 struct GameNode* find_game_by_sd( const int );
 struct GameNode* find_game_by_index( const unsigned int );
 void delete_game( struct GameNode * );
-
-struct PlayerNode *player_head;
-struct GameNode *game_head;
-
-pthread_mutex_t player_mutex;
-pthread_mutex_t game_mutex;
 
 //se il proprietario accetta la richiesta di unione alla partita inserisce i dati dell'avversario nel nodo partita e restituisce vero, falso altrimenti
 bool match_accepted(struct GameNode *, const int , const char *);
