@@ -1,5 +1,38 @@
 #include "server.h"
 
+int inizializza_server() //crea la socket, si mette in ascolto e restituisce il socket descriptor
+{
+    int sd;
+    int opt = 1; //1 = abilita, 0 = disabilita
+    struct sockaddr_in address;
+    socklen_t lenght = sizeof(struct sockaddr_in);
+
+    if ((sd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+        perror("socket creation error"), exit(EXIT_FAILURE);
+
+    //imposta la socket attivando SO_REUSEADDR che permette di riavviare velocemente il server in caso di crash o riavvii
+    if (setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) 
+    {
+        perror("Errore setsockopt");
+        close(sd);
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&address, 0, lenght);
+    address.sin_family = AF_INET;
+    address.sin_port = htons(8080);
+    address.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(sd, (struct sockaddr *) &address, lenght) < 0)
+        perror("binding error"), exit(EXIT_FAILURE);
+
+    if (listen(sd, 5) < 0)
+        perror("listen error"), exit(EXIT_FAILURE);
+
+    return sd;
+}
+
+/*
 Server server_init()
 {
    Server newServer;
@@ -37,9 +70,11 @@ Server server_init()
    return newServer;
 
 }
+*/
 
 void* player_thread( void *sd )
 {
+   printf("sono in player thread");
    const int player_sd = *( ( int * ) sd );
    struct PlayerNode *player = register_player( player_sd );
    show_new_player();
@@ -53,9 +88,13 @@ void* player_thread( void *sd )
 
 struct PlayerNode* register_player( const int player_sd )
 {
+   printf("sono in register player1");
    char *player_name = check_player( player_sd );
+   printf("sono in register player2"); 
    struct PlayerNode *player = add_player( player_name, player_sd );
+   printf("sono in register player3"); 
    free( player_name );
+   printf("sono in register player4"); 
    return player; 
 }
 

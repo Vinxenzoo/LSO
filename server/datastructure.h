@@ -59,7 +59,7 @@ struct PlayerNode
   pthread_t player_tid;
   int player_sd;
   struct PlayerNode *next_node;
-}players;
+};
 
 
 struct GameNode
@@ -73,7 +73,16 @@ struct GameNode
   pthread_cond_t cv_state;
   pthread_mutex_t mutex_state;
   struct GameNode *next_node;
-}games;
+};
+
+extern pthread_mutex_t player_mutex;
+extern pthread_mutex_t game_mutex;
+
+extern struct PlayerNode *player_head;
+extern struct GameNode *game_head;
+
+extern char ERROR;
+extern char NO_ERROR;
 
 
 #endif
