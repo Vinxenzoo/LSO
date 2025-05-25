@@ -9,6 +9,11 @@ struct GameNode *game_head = NULL;
 char ERROR = '1';
 char NO_ERROR = '0';
 
+const char NONE = '0';
+const char WON = '1';
+const char LOST = '2';
+const char DRAW = '3';
+
 int main()
 {
     //Server server = server_init();

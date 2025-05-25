@@ -21,6 +21,7 @@ enum game_status
   END_GAME
 };
 
+/*
 enum game_result
 {
   NONE,
@@ -28,6 +29,7 @@ enum game_result
   DEFEAT,
   DRAW
 };
+*/
 
 enum player_status
 {
@@ -84,5 +86,9 @@ extern struct GameNode *game_head;
 extern char ERROR;
 extern char NO_ERROR;
 
+extern const char NONE;
+extern const char WON;
+extern const char LOST;
+extern const char DRAW;
 
 #endif
