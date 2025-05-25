@@ -6,8 +6,8 @@
 #define SERVER_ERROR "01\n"
 
 #define VICTORY_M "\n1A\n"
-#define LOST    "\n1B\n"
-#define DRAW    "\n1C\n"
+#define LOST_M    "\n1B\n"
+#define DRAW_M    "\n1C\n"
 
 
 #define INSERT_PLAYER_NAME "20\n"

@@ -327,7 +327,8 @@ char send_move(unsigned short int *moves)
     //ottiene una mossa valida (da 1 a 9 o 0 per resa)
     int move_index = get_valid_move();
     char move = move_index + '0';
-
+    
+    printf("INVIANDO %c\n", move);
     // invia la mossa al server
     send(sd, &move, 1, 0);
 
@@ -337,11 +338,12 @@ char send_move(unsigned short int *moves)
         insertO(move_index);
     }
 
-    //stampa la griglia dopo averla pulita
+    /*stampa la griglia dopo averla pulita
     if (system("clear") < 0)
     {
         perror("Error"), exit(EXIT_FAILURE);
     }
+    */
     print_grid();
 
     //in caso di resa
@@ -367,6 +369,7 @@ char send_move(unsigned short int *moves)
 
 char receive_move(unsigned short int *moves)
 {
+    printf("%u\n", *moves);
     char move[2] = {'\0', '\0'};
     char move_index = 0;
     char outcome = NONE;
@@ -378,15 +381,19 @@ char receive_move(unsigned short int *moves)
     } 
     move_index = atoi(move);
 
+    printf("%cMOVE\n", move);
+    printf("%dMOVE_INDEX\n", move_index);
     if (move_index != 0)
     {
         insertX(move_index);
     } 
 
+    /*
     if (system("clear") < 0)
     {
         perror("Error"), exit(EXIT_FAILURE);
     } 
+    */
 
     print_grid();
 

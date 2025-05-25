@@ -314,6 +314,7 @@ void lobby_handler( struct PlayerNode *player )
 
                     while (player -> status == IN_GAME)
                     {
+                        printf("CAPASSO1\n");
                         //attende un segnale di fine partita
                         pthread_cond_wait(&(player -> cv_state), &(player -> mutex_state));
                     }
@@ -540,19 +541,19 @@ bool match_accepted(struct GameNode *match, const int opponent, const char *name
         return false;
     }
 
-
     if (response == 'S')
     {
         strcpy(match -> enemy, name_opp);
         match -> enemy_sd = opponent;
-        if (send(host, "*** starting match by host***\n", 44, MSG_NOSIGNAL) < 0) err_handler(host);
-        if (send(opponent, "*** starting match by opponent***\n", 42, MSG_NOSIGNAL) < 0) err_handler(opponent);
+        if (send(host, "~Host~\n", 44, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (send(opponent, "\n~Opponent~\n", 42, MSG_NOSIGNAL) < 0) err_handler(opponent);
         if (match != NULL)
         {
             match -> status  =  RUNNING;
             match -> join_request = false;
             pthread_cond_signal(&(match -> cv_state));
         }
+        printf("CAPASSO\n");
         return true;
     }
     else
@@ -604,8 +605,8 @@ void play_game(struct GameNode *gameData)
 
         bool err = false; //rappresenta un errore di disconnesione
         char play = '\0';
-        enum game_result host_result = NONE; //il codice del client cambia il valore di questa variabile quando la partita finisce
-        enum game_result opponent_result = NONE; // oppure altro valore iniziale
+        char host_result = NONE; //il codice del client cambia il valore di questa variabile quando la partita finisce
+        char opponent_result = NONE; // oppure altro valore iniziale
 
         //'0' = ancora in corso '1' = vince proprietario, '2' = vince avversario, '3' = pareggio
 
@@ -617,14 +618,14 @@ void play_game(struct GameNode *gameData)
             if (round%2 != 0)
             {
                 //inizia il proprietario
-                if (recv(host, &play, 1, 0) <= 0) {err_handler(host); }
+                if (recv(host, &play, 1, 0) <= 0) {err_handler(host); } printf("Server owner %c", play);
                 if (recv(host, &host_result, 1, 0) <= 0) {err_handler(host); }
                 if (send(opponent, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (host_result != NONE) break;
 
                 //turno dell'avversario
-                if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
+                if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;} printf("Server oppoent %c", play);
                 if (recv(opponent, &opponent_result, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
                 if (send(host, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
                 if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
@@ -655,7 +656,7 @@ void play_game(struct GameNode *gameData)
         }
 
         //si aggiornano i contatori dei giocatori
-        if (host_result == VICTORY || opponent_result == DEFEAT)
+        if (host_result == WON || opponent_result == LOST)
         {
             owner -> wins++;
             opponent_struct -> losts++;
@@ -665,7 +666,7 @@ void play_game(struct GameNode *gameData)
             pthread_cond_signal(&(opponent_struct -> cv_state));
             break;
         }
-        else if (host_result == DEFEAT || opponent_result == VICTORY)
+        else if (host_result == LOST || opponent_result == WON)
         {
             owner -> losts++;
             opponent_struct -> wins++;
@@ -681,13 +682,14 @@ void play_game(struct GameNode *gameData)
 
         gameData -> status = END_GAME;
         show_game_changement();
-
+        printf("SONO DOPO SHOW GAME CHANGEMENT\n");
     //partita finita, rimane in stato terminata finchè la rivincita viene accettata o rifiutata
     } while (rematch(host, opponent));
 }
 
 bool rematch(const int host, const int opponent_sd)
 {
+    printf("REMATCH\n");
     struct PlayerNode *opponent = findPlayer_socket_desc(opponent_sd);
     char opponent_response = '\0';
     char host_response = '\0';
@@ -726,7 +728,7 @@ bool rematch(const int host, const int opponent_sd)
 bool quit(const int host)
 {
     char response = '\0';
-    if (send(host, "Do ypu want to accept another player? [s/n]\n", 40, MSG_NOSIGNAL) < 0) err_handler(host);
+    if (send(host, "Do you want to accept another player? [s/n]\n", 60, MSG_NOSIGNAL) < 0) err_handler(host);
     if (recv(host, &response, 1, 0) <= 0) err_handler(host);
     
     if (response == 'S') return false;
