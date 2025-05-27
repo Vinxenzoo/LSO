@@ -694,21 +694,21 @@ bool rematch(const int host, const int opponent_sd)
     char opponent_response = '\0';
     char host_response = '\0';
 
-    if (send(opponent_sd, "Rematch? [s/n]\n", 17, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+    if (send(opponent_sd, "Rematch? [y/n]\n", 17, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
     if (recv(opponent_sd, &opponent_response, 1, 0) <= 0) err_handler(opponent_sd);
     
-    if (opponent_response != 'S') {if (send(host, "Rematch refused\n", 36, MSG_NOSIGNAL) < 0) err_handler(host);}
+    if (opponent_response != 'Y') {if (send(host, "Rematch refused by opponent\n", 36, MSG_NOSIGNAL) < 0) err_handler(host);}
     else //avversario vuole rivincita
     {
         if (send(opponent_sd, "Waiting host...\n", 30, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
-        if (send(host, "do you want a rematch? [s/n]\n", 48, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (send(host, "do you want a rematch? [y/n]\n", 48, MSG_NOSIGNAL) < 0) err_handler(host);
         if (recv(host, &host_response, 1, 0) <= 0) err_handler(host);
     }
-    if (host_response != 'S') //si torna alla lobby
+    if (host_response != 'Y') //si torna alla lobby
     {
         if (host_response == 'N')
         {
-            if (send(opponent_sd, "Rematch refused\n", 37, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+            if (send(opponent_sd, "Rematch refused by opponent\n", 37, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
         }
         if (opponent != NULL)
         {
