@@ -27,7 +27,7 @@ struct GameNode *game_head;
 */
 
 //Server server_init();
-int inizializza_server();
+int init_server();
 
 void* player_thread( void *sd );
 

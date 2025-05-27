@@ -173,7 +173,6 @@ void start_client_session()
         memset(inbuffer, 0, MAXREADER); // Pulisce il buffer per il prossimo ciclo
     }
     
-    printf("sono uscito dal loop e stai %s", inbuffer);
     // Gestione della chiusura della connessione
     pthread_kill(tid_writer, SIGUSR1); // Assicura la terminazione del writer
     if (errno != 0)

@@ -17,7 +17,7 @@ const char DRAW = '3';
 int main()
 {
     //Server server = server_init();
-    int sd = inizializza_server();
+    int sd = init_server();
     printf( "Server running on port 8080.\n" );
 
     int client_sd;
