@@ -286,20 +286,20 @@ void lobby_handler( struct PlayerNode *player )
         }
         else 
         {   //invia la richiesta di unione alla partita, se accettata si blocca sulla propria cond_var fino a fine partita
-            int indice = atoi(inbuffer);
-            struct GameNode *partita = NULL;
-            if (indice != 0) partita = (find_game_by_index(indice));
+            int index = atoi(inbuffer);
+            struct GameNode *match = NULL;
+            if (index != 0) match = (find_game_by_index(index));
 
-            if (partita == NULL)
+            if (match == NULL)
             {
                 if (send(sock_desc_player, "Match not found\n", 16, MSG_NOSIGNAL) < 0) err_handler(sock_desc_player);
             }
             else
             {   //gestisce la richiesta alla partita
                 player -> status = REQUESTING;
-                if (!match_accepted(partita, sock_desc_player, player -> name))
+                if (!match_accepted(match, sock_desc_player, player -> name))
                 {
-                    if (partita -> join_request == false)
+                    if (match -> join_request == false)
                         {if (send(sock_desc_player, "Join request refused\n", 21, MSG_NOSIGNAL) < 0) err_handler(sock_desc_player);}
                     else   
                         {if (send(sock_desc_player, "Another player have already take place in game\n", 47, MSG_NOSIGNAL) < 0) err_handler(sock_desc_player);}
@@ -352,7 +352,7 @@ bool accept_game( struct GameNode *game, const int enemy_sd, const char *enemy_n
 
    char response = '\0';
 
-   if( send( enemy_sd, WAITING_OWNER_RESPONSE, 3, MSG_NOSIGNAL ) < 0 )
+   if( send( enemy_sd, "Waiting host...\n", 16, MSG_NOSIGNAL ) < 0 )
    {
       err_handler( owner_sd );
       return false;
@@ -363,16 +363,16 @@ bool accept_game( struct GameNode *game, const int enemy_sd, const char *enemy_n
       return false;
    }
 
-   if( response == 'S' )
+   if( response == 'Y' || response == 'y')
    {
       strcpy( game->enemy, enemy_name );
       game->enemy_sd = enemy_sd;
 
-      if( send( owner_sd, STARTING_GAME_OWNER, 3, MSG_NOSIGNAL) < 0 )
+      if( send( owner_sd, "Starting a game as Host\n", 24, MSG_NOSIGNAL) < 0 )
       {
          err_handler( owner_sd );
       }
-      if( send( owner_sd, STARTING_GAME_ENEMY, 3, MSG_NOSIGNAL) < 0 )
+      if( send( owner_sd, "Starting a game as Opponent\n", 28, MSG_NOSIGNAL) < 0 )
       {
          err_handler( enemy_sd );
       }
@@ -467,7 +467,6 @@ struct GameNode* find_game_by_index( const unsigned int index )
 
       if( game_index == index )
       {
-         printf("dido\n");
          pthread_mutex_unlock( &game_mutex );
          return game;
       }
@@ -514,16 +513,15 @@ void delete_game( struct GameNode *game )
 
 bool match_accepted(struct GameNode *match, const int opponent, const char *name_opp)
 {
-   printf("avversario: %s\n", name_opp);
     if (match -> join_request == true) return false;
     const int host = match -> owner_sd;
     char buf[MAX_MESSAGE_SIZE];
     memset(buf, 0, MAX_MESSAGE_SIZE);
-    strcat(buf, name_opp); strcat(buf, "Do you accept? [y/n]\n");
+    strcat(buf, name_opp); strcat(buf, " wants to play with you. Do you accept? [y/n]\n");
 
     char response = '\0'; //si occupa il codice client di verificare l'input
 
-    if (send(opponent, "attend host...\n", 30, MSG_NOSIGNAL) < 0) err_handler(opponent);
+    if (send(opponent, "Waiting host...\n", 16, MSG_NOSIGNAL) < 0) err_handler(opponent);
     match -> join_request = true;
 
     if (send(host, buf, strlen(buf), MSG_NOSIGNAL) < 0) 
@@ -541,8 +539,8 @@ bool match_accepted(struct GameNode *match, const int opponent, const char *name
     {
         strcpy(match -> enemy, name_opp);
         match -> enemy_sd = opponent;
-        if (send(host, "~Host~\n", 44, MSG_NOSIGNAL) < 0) err_handler(host);
-        if (send(opponent, "\n~Opponent~\n", 42, MSG_NOSIGNAL) < 0) err_handler(opponent);
+        if (send(host, "Starting a game as Host\n", 24, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (send(opponent, "Starting a game as Opponent\n", 28, MSG_NOSIGNAL) < 0) err_handler(opponent);
         if (match != NULL)
         {
             match -> status  =  RUNNING;
@@ -613,14 +611,14 @@ void play_game(struct GameNode *gameData)
             if (round%2 != 0)
             {
                 //inizia il proprietario
-                if (recv(host, &play, 1, 0) <= 0) {err_handler(host); } printf("Server owner %c", play);
+                if (recv(host, &play, 1, 0) <= 0) {err_handler(host); }
                 if (recv(host, &host_result, 1, 0) <= 0) {err_handler(host); }
                 if (send(opponent, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (send(opponent, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(opponent); err = true; break;}
                 if (host_result != NONE) break;
 
                 //turno dell'avversario
-                if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;} printf("Server oppoent %c", play);
+                if (recv(opponent, &play, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
                 if (recv(opponent, &opponent_result, 1, 0) <= 0) {err_handler(opponent); err = true; break;}
                 if (send(host, &NO_ERROR, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
                 if (send(host, &play, 1, MSG_NOSIGNAL) < 0) {err_handler(host); }
@@ -687,21 +685,21 @@ bool rematch(const int host, const int opponent_sd)
     char opponent_response = '\0';
     char host_response = '\0';
 
-    if (send(opponent_sd, "Rematch? [y/n]\n", 17, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+    if (send(opponent_sd, "Rematch? [y/n]\n", 15, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
     if (recv(opponent_sd, &opponent_response, 1, 0) <= 0) err_handler(opponent_sd);
     
-    if (opponent_response != 'Y') {if (send(host, "Rematch refused by opponent\n", 36, MSG_NOSIGNAL) < 0) err_handler(host);}
+    if (opponent_response != 'Y') {if (send(host, "Rematch refused by opponent\n", 28, MSG_NOSIGNAL) < 0) err_handler(host);}
     else //avversario vuole rivincita
     {
-        if (send(opponent_sd, "Waiting host...\n", 30, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
-        if (send(host, "do you want a rematch? [y/n]\n", 48, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (send(opponent_sd, "Waiting host...\n", 16, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+        if (send(host, "Do you want a rematch? [y/n]\n", 29, MSG_NOSIGNAL) < 0) err_handler(host);
         if (recv(host, &host_response, 1, 0) <= 0) err_handler(host);
     }
     if (host_response != 'Y') //si torna alla lobby
     {
-        if (host_response == 'N')
+        if (host_response == 'N' || host_response == 'n')
         {
-            if (send(opponent_sd, "Rematch refused by host\n", 37, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+            if (send(opponent_sd, "Rematch refused by host\n", 23, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
         }
         if (opponent != NULL)
         {
@@ -712,8 +710,8 @@ bool rematch(const int host, const int opponent_sd)
     }
     else
     {
-        if (send(opponent_sd, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
-        if (send(host, "Rematch accepted, ready for the next rpund\n", 50, MSG_NOSIGNAL) < 0) err_handler(host);
+        if (send(opponent_sd, "Rematch accepted, ready for the next round\n", 43, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+        if (send(host, "Rematch accepted, ready for the next round\n", 43, MSG_NOSIGNAL) < 0) err_handler(host);
         return true;
     }
 }
@@ -721,10 +719,10 @@ bool rematch(const int host, const int opponent_sd)
 bool quit(const int host)
 {
     char response = '\0';
-    if (send(host, "Do you want to accept another player? [y/n]\n", 60, MSG_NOSIGNAL) < 0) err_handler(host);
+    if (send(host, "Do you want to accept another player? [y/n]\n", 44, MSG_NOSIGNAL) < 0) err_handler(host);
     if (recv(host, &response, 1, 0) <= 0) err_handler(host);
     
-    if (response == 'Y') return false;
+    if (response == 'Y' || response == 'y') return false;
     else return true;
 }
 
@@ -895,7 +893,7 @@ void send_game()
 
     char game_state[28];
 
-    if (momentary == NULL) {if (send(client, "\nthere aren't match actives now, write\"create\"for create ones \"esc\" to exit\n", 80, MSG_NOSIGNAL) < 0) err_handler(client);}
+    if (momentary == NULL) {if (send(client, "\nThere aren't match actives now, write \"create\" for create ones or \"esc\" to exit\n", 84, MSG_NOSIGNAL) < 0) err_handler(client);}
     else
     {
         if (send(client, "\n\nMATCH LIST\n", 13, MSG_NOSIGNAL) < 0) err_handler(client);
@@ -918,14 +916,13 @@ void send_game()
                     strcpy(game_state, "Ended a game\n");
                     break;
             }
-            strcat(buff_out, momentary -> owner); strcat(buff_out, "\nmatch's "); 
-            strcat(buff_out, momentary -> enemy); strcat(buff_out, "\nOpponent: ");
+            strcat(buff_out, momentary -> owner); strcat(buff_out, "\nmatch "); 
+            strcat(buff_out, momentary -> enemy); strcat(buff_out, "\nOpponent ");
             strcat(buff_out, game_state); strcat(buff_out, "\nState's ");
 
             if (momentary -> status == NEW_GAME || momentary -> status== WAITING)
             {
                 i++;
-                  printf("\nID: %d", i);
                 sprintf(index_str, "%u\n", i);
                 strcat(buff_out, "ID: "); strcat(buff_out, index_str);
             }

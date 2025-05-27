@@ -154,13 +154,13 @@ void start_client_session()
     // Loop di ricezione dei messaggi dal server
     while (recv(sd, inbuffer, MAXREADER, 0) > 0)
     {
-        if (strcmp(inbuffer, "~Host~\n") == 0) 
+        if (strcmp(inbuffer, "Starting a game as Host\n") == 0) 
         {
             pthread_kill(tid_writer, SIGUSR1); // Ferma il thread di scrittura
             play_games(inbuffer, HOST);        // Inizia partita da host
             pthread_create(&tid_writer, &attr, thread_writer, NULL); // Ricrea il thread dopo la partita
         }
-        else if (strcmp(inbuffer, "\n~Opponent~\n") == 0) 
+        else if (strcmp(inbuffer, "Starting a game as Opponent\n") == 0) 
         {
             pthread_kill(tid_writer, SIGUSR1); // Ferma il thread di scrittura
             play_games(inbuffer, OPPONENT);    // Inizia partita da ospite
