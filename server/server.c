@@ -249,9 +249,9 @@ void lobby_handler( struct PlayerNode *player )
 
         outbuffer[0] = '\n'; //invio della stringa statistiche
         strcat(outbuffer, player -> name);
-        strcat(outbuffer, "\nvittorie: "); strcat(outbuffer, vittorie);
-        strcat(outbuffer, "\nsconfitte: "); strcat(outbuffer, sconfitte);
-        strcat(outbuffer, "\npareggi: "); strcat(outbuffer, pareggi);
+        strcat(outbuffer, "\nwins: "); strcat(outbuffer, vittorie);
+        strcat(outbuffer, "\nlosts: "); strcat(outbuffer, sconfitte);
+        strcat(outbuffer, "\ndraws: "); strcat(outbuffer, pareggi);
         if (send(sd_giocatore, outbuffer, strlen(outbuffer), MSG_NOSIGNAL) < 0) err_handler(sd_giocatore);
        
         send_game();
@@ -708,7 +708,7 @@ bool rematch(const int host, const int opponent_sd)
     {
         if (host_response == 'N')
         {
-            if (send(opponent_sd, "Rematch refused by opponent\n", 37, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
+            if (send(opponent_sd, "Rematch refused by host\n", 37, MSG_NOSIGNAL) < 0) err_handler(opponent_sd);
         }
         if (opponent != NULL)
         {
