@@ -16,7 +16,6 @@ const char DRAW = '3';
 
 int main()
 {
-    //Server server = server_init();
     int sd = init_server();
     printf( "Server running on port 8080.\n" );
 
@@ -34,7 +33,7 @@ int main()
     sig_action->sa_flags = SA_RESTART;
     sig_action->sa_handler = send_game;
     sigaction( SIGUSR1, sig_action, NULL );
-    sig_action->sa_handler = handler_newPlayer;
+    sig_action->sa_handler = handler_new_player;
     sigaction( SIGUSR2, sig_action, NULL );
     signal( SIGALRM, sigalrm_h );
     signal( SIGTERM, docker_SIGTERM_h );

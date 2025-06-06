@@ -15,45 +15,31 @@
 #include <stdbool.h>
 #include "datastructures.h"
 
-//si connette alla socket del server, restituisce il sd del client
-void init_socket(); //CAMBIATA
+void init_socket();
 
-//funzione che rappresenta il ciclo di vita del giocatore
-void start_client_session(); //CAMBIATA
-//start function del thread che scrive sulla socket
-void* thread_writer(); //NON CAMBIATA
+void start_client_session();
+void* thread_writer();
 
-//funzione che gestisce la partita tra 2 giocatori, incluse eventuali rivincite
-void play_games(char *inbuffer, const enum player_type type); //NON CAMBIATA
+void play_games(char *inbuffer, const enum player_type type);
 
-// Chiede all'utente di inserire una mossa valida (0–9), la valida, e la restituisce.
-int get_valid_move(); //NUOVA
-//aggiorna la griglia di gioco e il numero giocate, invia la giocata e l'esito della partita al server, restituisce l'esito
-char send_move(unsigned short int *moves); //CAMBIATA
-//riceve la giocata dal server, aggiorna la griglia, restituisce l'esito
-char receive_move(unsigned short int *moves); //NON CAMBIATA
+int get_valid_move(); 
+char send_move(unsigned short int *moves); 
+char receive_move(unsigned short int *moves);
 
-//controlla chi ha vinto e restituisce l'esito
-char check_outcome(const unsigned short int *moves); //CAMBIATA
-//controlla se il giocatore ha inserito un input valido
-bool check_move(const int move); //NON CAMBIATA
+char check_outcome(const unsigned short int *moves); 
+bool check_move(const int move);
 
-//inserisce O nella griglia in base alla mossa del giocatore
-void insertO(const unsigned short int move); //LEGGERMENTE CAMBIATA
-//inserisce X nella griglia in base alla mossa dell'avversario
-void insertX(const unsigned short int move); //LEGGERMENTE CAMBIATA
-//stampa la griglia attuale
-void print_grid(); //CAMBIATA
 
-//gestiscono la richiesta di rivincita, restituendo true se la rivincita è stata accettata
-bool rematch_host(); //NON CAMBIATA
-bool rematch_opponent(); //NON CAMBIATA
+void insertO(const unsigned short int move); 
+void insertX(const unsigned short int move); 
 
-//manda un messaggio di errore e chiude il processo
+void print_grid(); 
+
+bool rematch_host(); 
+bool rematch_opponent();
+
 void error_handler(); 
-//uccide il thread quando viene inviato il segnale SIGUSR1
-void SIGUSR1_handler(); 
-//gestisce SIGTERM inviato da docker quando stoppa i container
+void SIGUSR1_handler();
 void SIGTERM_handler(); 
 
 #endif

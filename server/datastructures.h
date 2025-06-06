@@ -1,7 +1,6 @@
-#ifndef DATASTRUCT_H
-#define DATASTRUCT_H
+#ifndef DATASTRUCTURES_H
+#define DATASTRUCTURES_H
 
-//Used libraries
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -21,16 +20,6 @@ enum game_status
   END_GAME
 };
 
-/*
-enum game_result
-{
-  NONE,
-  VICTORY,
-  DEFEAT,
-  DRAW
-};
-*/
-
 enum player_status
 {
   IN_LOBBY,
@@ -38,15 +27,14 @@ enum player_status
   IN_GAME
 };
 
-typedef struct ServerStruct //Pascal Case
+typedef struct ServerStruct 
 {
-    int sd;
-    socklen_t addrlen;
-    struct sockaddr_in address;
-    unsigned short int opt;
+  int sd;
+  socklen_t addrlen;
+  struct sockaddr_in address;
+  unsigned short int opt;
 
-}Server; //Pascal Case
-
+}Server;
 
 struct PlayerNode
 {
@@ -62,7 +50,6 @@ struct PlayerNode
   int player_sd;
   struct PlayerNode *next_node;
 };
-
 
 struct GameNode
 {

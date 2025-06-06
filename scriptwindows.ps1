@@ -1,24 +1,22 @@
-# Chiedi all'utente il numero di client
-Write-Host "Inserisci il numero di client da avviare"
+
+Write-Host "Number of clients to start:"
 $n_client = Read-Host
 
-# Verifica se il numero di client è un numero positivo
 if ($n_client -lt 1)
 {
-    Write-Host "Riprova, inserisci un numero valido di client"
+    Write-Host "Try again, enter a valid number of clients!"
     exit
 }
-# Avvia docker compose
+
 Start-Process powershell -ArgumentList  "-NoExit", "-Command", "docker-compose up --build --scale client=$n_client"
 
-# Aspetta che tutti i container siano avviati
+
 $allContainersRunning = $false
 while (-not $allContainersRunning)
 {
-    # Ottieni i nomi dei container in esecuzione
+
     $containers = docker ps --format "{{.Names}}"
 
-    # Controlla se i container desiderati sono in esecuzione
     $allContainersRunning = $true
     for ($i = 1; $i -le $n_client; $i++) 
     {
@@ -29,15 +27,14 @@ while (-not $allContainersRunning)
             break
         }
     }
-    # Aspetta 2 secondi prima di un altro controllo
+  
     if (-not $allContainersRunning)
     {
         Start-Sleep -Seconds 2
     }
 }
 
-#avvia una finestra powershell per ogni client
 for ($i = 1; $i -le $n_client; $i++)
 {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "docker attach tris-lso-client-$i"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "docker attach progetto-lso-client-$i"
 }
